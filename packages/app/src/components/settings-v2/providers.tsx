@@ -10,6 +10,7 @@ import { useServerProtocol, useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { DialogConnectProvider, useProviderConnectController } from "../dialog-connect-provider"
 import { DialogCustomProvider } from "../dialog-custom-provider"
+import type { ProviderConfigShape } from "../dialog-custom-provider-form"
 import { SettingsListV2 } from "./parts/list"
 import "./settings-v2.css"
 
@@ -83,6 +84,21 @@ export const SettingsProvidersV2: Component<{
 
   const canDisconnect = (item: ProviderItem) =>
     source(item) !== "env" && (protocol() === "v1" || !isConfigCustom(item.id))
+
+  // Only config-backed OpenAI-compatible providers carry an editable baseURL /
+  // key / model list. Keys entered here replace whatever is stored in auth.
+  const canEdit = (item: ProviderItem) => protocol() === "v1" && isConfigCustom(item.id)
+
+  const edit = (item: ProviderItem) => {
+    const config = serverSync().data.config.provider?.[item.id]
+    if (!config) return
+    dialog.show(() => (
+      <DialogCustomProvider
+        onBack={dialog.close}
+        initial={{ providerID: item.id, config: config as ProviderConfigShape }}
+      />
+    ))
+  }
 
   const note = (id: string) => PROVIDER_NOTES.find((item) => item.match(id))?.key
 
@@ -173,18 +189,29 @@ export const SettingsProvidersV2: Component<{
                         <Tag>{type(item)}</Tag>
                       </div>
                     </div>
-                    <Show
-                      when={canDisconnect(item)}
-                      fallback={
-                        <span class="settings-v2-provider-env-hint">
-                          {language.t("settings.providers.connected.environmentDescription")}
-                        </span>
-                      }
-                    >
-                      <ButtonV2 size="normal" variant="ghost-muted" onClick={() => void disconnect(item.id, item.name)}>
-                        {language.t("common.disconnect")}
-                      </ButtonV2>
-                    </Show>
+                    <div class="flex items-center gap-1">
+                      <Show when={canEdit(item)}>
+                        <ButtonV2 size="normal" variant="ghost-muted" onClick={() => edit(item)}>
+                          {language.t("common.edit")}
+                        </ButtonV2>
+                      </Show>
+                      <Show
+                        when={canDisconnect(item)}
+                        fallback={
+                          <span class="settings-v2-provider-env-hint">
+                            {language.t("settings.providers.connected.environmentDescription")}
+                          </span>
+                        }
+                      >
+                        <ButtonV2
+                          size="normal"
+                          variant="ghost-muted"
+                          onClick={() => void disconnect(item.id, item.name)}
+                        >
+                          {language.t("common.disconnect")}
+                        </ButtonV2>
+                      </Show>
+                    </div>
                   </div>
                 )}
               </For>

@@ -1,4 +1,10 @@
 [data-component="checkbox"] {
+  /* The visually hidden input below is `position: absolute`; without a
+     positioned ancestor here it is laid out against whatever positioned
+     element happens to be further up the tree (e.g. the dialog body), which
+     pushes its hit area outside the dialog and makes stray clicks land on the
+     overlay. Anchor it to the checkbox itself. */
+  position: relative;
   display: flex;
   align-items: var(--checkbox-align, center);
   gap: 12px;

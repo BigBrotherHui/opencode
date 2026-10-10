@@ -59,6 +59,12 @@ type ValidateArgs = {
   t: Translator
   disabledProviders: string[]
   existingProviderIDs: Set<string>
+  /**
+   * The provider entry currently on disk when editing. Fields the form does not
+   * manage (model `variants`, extra provider options, `env`, ...) are carried
+   * over so editing a provider does not silently drop them.
+   */
+  preserve?: ProviderConfigShape
 }
 
 const LIMIT_UNITS: Record<string, number> = { k: 1_000, m: 1_000_000 }
@@ -102,6 +108,65 @@ export function modelConfigEntry(row: ModelRow, name: string) {
   }
 
   return entry
+}
+
+export type ProviderConfigShape = {
+  name?: string
+  options?: {
+    baseURL?: string
+    headers?: Record<string, string>
+  }
+  models?: Record<
+    string,
+    {
+      name?: string
+      reasoning?: boolean
+      attachment?: boolean
+      temperature?: boolean
+      tool_call?: boolean
+      modalities?: { input?: string[] }
+      limit?: { context?: number; output?: number }
+    }
+  >
+}
+
+/**
+ * Rebuild editor rows from an existing `provider.<id>` config entry so the
+ * custom-provider form can be reused to edit a provider that is already saved.
+ */
+export function formFromProviderConfig(config: ProviderConfigShape | undefined): {
+  name: string
+  baseURL: string
+  models: ModelRow[]
+  headers: HeaderRow[]
+} {
+  const models = Object.entries(config?.models ?? {}).map(([id, entry]) => ({
+    ...modelRow(),
+    id,
+    name: entry?.name ?? id,
+    reasoning: entry?.reasoning === true,
+    attachment: entry?.attachment === true,
+    temperature: entry?.temperature === true,
+    toolCall: entry?.tool_call !== false,
+    inputModalities: (entry?.modalities?.input ?? []).filter(
+      (item): item is Modality => item !== "text" && (MODALITIES as readonly string[]).includes(item),
+    ),
+    contextLimit: entry?.limit?.context ? String(entry.limit.context) : "",
+    outputLimit: entry?.limit?.output ? String(entry.limit.output) : "",
+  }))
+
+  const headers = Object.entries(config?.options?.headers ?? {}).map(([key, value]) => ({
+    ...headerRow(),
+    key,
+    value: String(value),
+  }))
+
+  return {
+    name: config?.name ?? "",
+    baseURL: config?.options?.baseURL ?? "",
+    models: models.length ? models : [modelRow()],
+    headers: headers.length ? headers : [headerRow()],
+  }
 }
 
 export function validateCustomProvider(input: ValidateArgs) {
@@ -160,11 +225,6 @@ export function validateCustomProvider(input: ValidateArgs) {
     return { id: idError, name: nameError, limit: limitError }
   })
   const modelsValid = models.every((m) => !m.id && !m.name && !m.limit)
-  const modelConfig = Object.fromEntries(
-    input.form.models
-      .filter((m) => m.id.trim())
-      .map((m) => [m.id.trim(), modelConfigEntry(m, m.name.trim())]),
-  )
 
   const seenHeaders = new Set<string>()
   const headers = input.form.headers.map((h) => {
@@ -200,6 +260,34 @@ export function validateCustomProvider(input: ValidateArgs) {
   const ok = !idError && !existsError && !nameError && !urlError && modelsValid && headersValid
   if (!ok) return { err, models, headers }
 
+  const original = (input.preserve ?? {}) as Record<string, unknown>
+  const originalModels = (input.preserve?.models ?? {}) as Record<string, Record<string, unknown>>
+  const originalOptions = (original.options ?? {}) as Record<string, unknown>
+
+  // Keep everything the form does not own, so editing does not drop fields such
+  // as per-model `variants`.
+  const managedModelKeys = new Set(["name", "reasoning", "attachment", "temperature", "tool_call", "modalities", "limit"])
+  const mergedModels = Object.fromEntries(
+    input.form.models
+      .filter((m) => m.id.trim())
+      .map((m) => {
+        const id = m.id.trim()
+        const carried = Object.fromEntries(
+          Object.entries(originalModels[id] ?? {}).filter(([k]) => !managedModelKeys.has(k)),
+        )
+        return [id, { ...carried, ...modelConfigEntry(m, m.name.trim()) }]
+      }),
+  )
+
+  const carriedOptions = Object.fromEntries(
+    Object.entries(originalOptions).filter(([k]) => k !== "baseURL" && k !== "headers"),
+  )
+  const carriedProvider = Object.fromEntries(
+    Object.entries(original).filter(([k]) => !["npm", "name", "env", "options", "models"].includes(k)),
+  )
+  const preservedEnv: string[] | undefined = Array.isArray(original.env) ? (original.env as string[]) : undefined
+  const nextEnv: string[] | undefined = env ? [env] : preservedEnv
+
   return {
     err,
     models,
@@ -209,14 +297,16 @@ export function validateCustomProvider(input: ValidateArgs) {
       name,
       key,
       config: {
+        ...carriedProvider,
         npm: OPENAI_COMPATIBLE,
         name,
-        ...(env ? { env: [env] } : {}),
+        ...(nextEnv ? { env: nextEnv } : {}),
         options: {
+          ...carriedOptions,
           baseURL,
           ...(Object.keys(headerConfig).length ? { headers: headerConfig } : {}),
         },
-        models: modelConfig,
+        models: mergedModels,
       },
     },
   }
