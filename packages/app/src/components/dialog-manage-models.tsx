@@ -20,6 +20,8 @@ import { DialogConnectProvider } from "./dialog-connect-provider"
 import { decode64 } from "@/utils/base64"
 import { SettingsListV2 } from "./settings-v2/parts/list"
 import { SettingsRowV2 } from "./settings-v2/parts/row"
+import { DiscoverModelsButton } from "./discover-models-button"
+import { useModelDiscovery } from "./model-discovery"
 import "./settings-v2/settings-v2.css"
 
 type ModelItem = ReturnType<ReturnType<typeof useLocal>["model"]["list"]>[number]
@@ -28,6 +30,7 @@ export const DialogManageModels: Component = () => {
   const local = useLocal()
   const language = useLanguage()
   const dialog = useDialog()
+  const discovery = useModelDiscovery()
   const directory = () => decode64(local.slug())
 
   const handleConnectProvider = () => {
@@ -67,19 +70,22 @@ export const DialogManageModels: Component = () => {
           return (
             <>
               <span>{provider.name}</span>
-              <Tooltip
-                placement="top"
-                value={language.t("dialog.model.manage.provider.toggle", { provider: provider.name })}
-              >
-                <Switch
-                  class="-mr-1"
-                  checked={providerVisible(provider.id)}
-                  onChange={(checked) => setProviderVisibility(provider.id, checked)}
-                  hideLabel
+              <div class="flex items-center gap-2">
+                <DiscoverModelsButton providerID={provider.id} providerName={provider.name} />
+                <Tooltip
+                  placement="top"
+                  value={language.t("dialog.model.manage.provider.toggle", { provider: provider.name })}
                 >
-                  {provider.name}
-                </Switch>
-              </Tooltip>
+                  <Switch
+                    class="-mr-1"
+                    checked={providerVisible(provider.id)}
+                    onChange={(checked) => setProviderVisibility(provider.id, checked)}
+                    hideLabel
+                  >
+                    {provider.name}
+                  </Switch>
+                </Tooltip>
+              </div>
             </>
           )
         }}
@@ -120,8 +126,14 @@ export const DialogManageModelsV2: Component = () => {
   const local = useLocal()
   const language = useLanguage()
   const dialog = useDialog()
+  const discovery = useModelDiscovery()
   const directory = () => decode64(local.slug())
 
+  /**
+   * Re-read a custom provider's model list from the provider itself, so a
+   * provider configured with a single hand-typed model can be re-selected from
+   * everything it actually serves.
+   */
   const handleConnectProvider = () => {
     void dialog.show(() => <DialogConnectProvider directory={directory} />)
   }
@@ -224,7 +236,12 @@ export const DialogManageModelsV2: Component = () => {
                           <ProviderIcon id={group.category} width={16} height={16} class="ml-4 shrink-0" />
                           <h3 class="settings-v2-section-title">{group.items[0].provider.name}</h3>
                         </div>
-                        <div>
+                        <div class="flex items-center">
+                          <DiscoverModelsButton
+                            providerID={group.category}
+                            providerName={group.items[0].provider.name}
+                            class="mr-2"
+                          />
                           <SwitchV2
                             class="mr-6"
                             checked={providerVisible(group.category)}

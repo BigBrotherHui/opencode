@@ -24,6 +24,7 @@ import type {
   ConfigProvidersResponses,
   ConfigUpdateErrors,
   ConfigUpdateResponses,
+  DiscoverModelsPayload,
   EventSubscribeResponses,
   EventTuiCommandExecute,
   EventTuiPromptAppend,
@@ -145,12 +146,16 @@ import type {
   PromptInput,
   ProviderAuthErrors,
   ProviderAuthResponses,
+  ProviderDiscoverErrors,
+  ProviderDiscoverResponses,
   ProviderListErrors,
   ProviderListResponses,
   ProviderOauthAuthorizeErrors,
   ProviderOauthAuthorizeResponses,
   ProviderOauthCallbackErrors,
   ProviderOauthCallbackResponses,
+  ProviderTestErrors,
+  ProviderTestResponses,
   PtyConnectErrors,
   PtyConnectResponses,
   PtyConnectTokenErrors,
@@ -232,6 +237,7 @@ import type {
   SyncStartResponses,
   SyncStealErrors,
   SyncStealResponses,
+  TestModelPayload,
   TextPartInput,
   ToolIdsErrors,
   ToolIdsResponses,
@@ -3350,6 +3356,80 @@ export class Provider extends HeyApiClient {
       url: "/provider/auth",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Discover models from an OpenAI-compatible base URL
+   *
+   * Probe an OpenAI-compatible endpoint at `{baseURL}/v1/models` and return the list of model IDs. Resolves env-var API keys on the server and bypasses browser CORS. Loopback and LAN hosts stay reachable so local runtimes can be discovered; cloud instance-metadata endpoints are blocked. Requires the same authorization as config writes.
+   */
+  public discover<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      discoverModelsPayload?: DiscoverModelsPayload
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "discoverModelsPayload", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ProviderDiscoverResponses, ProviderDiscoverErrors, ThrowOnError>({
+      url: "/provider/discover",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Send a probe request to one model
+   *
+   * Send a single short prompt to a configured model and report time to first token, total time, token usage, and the reply text. A failed probe is returned as data with a classified reason so the UI can distinguish a bad credential from an unreachable endpoint.
+   */
+  public test<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      testModelPayload?: TestModelPayload
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "testModelPayload", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ProviderTestResponses, ProviderTestErrors, ThrowOnError>({
+      url: "/provider/test",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 

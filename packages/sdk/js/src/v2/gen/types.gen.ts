@@ -2543,6 +2543,53 @@ export type ProviderAuthError1 = {
   }
 }
 
+export type DiscoverModelsPayload = {
+  providerID?: string
+  baseURL: string
+  apiKey?: string
+  headers?: {
+    [key: string]: string
+  }
+  timeoutMs?: string
+}
+
+export type DiscoverModelsOk = {
+  ok: true
+  ids: Array<string>
+}
+
+export type DiscoverModelsError = {
+  ok: false
+  kind: "invalidUrl" | "blocked" | "noCredential" | "unauthorized" | "invalidFormat" | "timeout" | "tooLarge" | "failed"
+  message?: string
+}
+
+export type DiscoverModelsResult = DiscoverModelsOk | DiscoverModelsError
+
+export type TestModelPayload = {
+  providerID: string
+  modelID: string
+  prompt?: string
+}
+
+export type TestModelOk = {
+  ok: true
+  firstTokenMs: number
+  totalMs: number
+  inputTokens?: number
+  outputTokens?: number
+  text: string
+  finishReason?: string
+}
+
+export type TestModelError = {
+  ok: false
+  kind: "modelNotFound" | "unauthorized" | "timeout" | "rateLimited" | "failed"
+  message?: string
+}
+
+export type TestModelResult = TestModelOk | TestModelError
+
 export type NotFoundError = {
   name: "NotFoundError"
   data: {
@@ -9438,6 +9485,62 @@ export type ProviderOauthCallbackResponses = {
 }
 
 export type ProviderOauthCallbackResponse = ProviderOauthCallbackResponses[keyof ProviderOauthCallbackResponses]
+
+export type ProviderDiscoverData = {
+  body?: DiscoverModelsPayload
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/provider/discover"
+}
+
+export type ProviderDiscoverErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ProviderDiscoverError = ProviderDiscoverErrors[keyof ProviderDiscoverErrors]
+
+export type ProviderDiscoverResponses = {
+  /**
+   * Discovered model IDs or error
+   */
+  200: DiscoverModelsResult
+}
+
+export type ProviderDiscoverResponse = ProviderDiscoverResponses[keyof ProviderDiscoverResponses]
+
+export type ProviderTestData = {
+  body?: TestModelPayload
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/provider/test"
+}
+
+export type ProviderTestErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ProviderTestError = ProviderTestErrors[keyof ProviderTestErrors]
+
+export type ProviderTestResponses = {
+  /**
+   * Model connectivity and latency result
+   */
+  200: TestModelResult
+}
+
+export type ProviderTestResponse = ProviderTestResponses[keyof ProviderTestResponses]
 
 export type SessionListData = {
   body?: never

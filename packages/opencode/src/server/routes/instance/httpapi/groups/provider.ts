@@ -31,6 +31,72 @@ export class ProviderAuthApiError extends Schema.ErrorClass<ProviderAuthApiError
   { httpApiStatus: 400 },
 ) {}
 
+const DiscoverModelsErrorKind = Schema.Union([
+  Schema.Literal("invalidUrl"),
+  Schema.Literal("blocked"),
+  Schema.Literal("noCredential"),
+  Schema.Literal("unauthorized"),
+  Schema.Literal("invalidFormat"),
+  Schema.Literal("timeout"),
+  Schema.Literal("tooLarge"),
+  Schema.Literal("failed"),
+])
+
+export const DiscoverModelsPayload = Schema.Struct({
+  providerID: Schema.optionalKey(Schema.String),
+  baseURL: Schema.String,
+  apiKey: Schema.optionalKey(Schema.String),
+  headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  timeoutMs: Schema.optionalKey(Schema.NumberFromString),
+}).annotate({ identifier: "DiscoverModelsPayload" })
+
+export const DiscoverModelsResult = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    ids: Schema.mutable(Schema.Array(Schema.String)),
+  }).annotate({ identifier: "DiscoverModelsOk" }),
+  Schema.Struct({
+    ok: Schema.Literal(false),
+    kind: DiscoverModelsErrorKind,
+    message: Schema.optionalKey(Schema.String),
+  }).annotate({ identifier: "DiscoverModelsError" }),
+]).annotate({ identifier: "DiscoverModelsResult" })
+
+export const TestModelPayload = Schema.Struct({
+  providerID: Schema.String,
+  modelID: Schema.String,
+  prompt: Schema.optionalKey(Schema.String),
+}).annotate({ identifier: "TestModelPayload" })
+
+const TestModelErrorKind = Schema.Union([
+  Schema.Literal("modelNotFound"),
+  Schema.Literal("unauthorized"),
+  Schema.Literal("timeout"),
+  Schema.Literal("rateLimited"),
+  Schema.Literal("failed"),
+])
+
+export const TestModelResult = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    /** Milliseconds from request start to the first streamed token. */
+    firstTokenMs: Schema.Finite,
+    /** Milliseconds to the end of the streamed response. */
+    totalMs: Schema.Finite,
+    /** Tokens reported by the provider, when it reports usage at all. */
+    inputTokens: Schema.optionalKey(Schema.Finite),
+    outputTokens: Schema.optionalKey(Schema.Finite),
+    /** Model text, trimmed for display. */
+    text: Schema.String,
+    finishReason: Schema.optionalKey(Schema.String),
+  }).annotate({ identifier: "TestModelOk" }),
+  Schema.Struct({
+    ok: Schema.Literal(false),
+    kind: TestModelErrorKind,
+    message: Schema.optionalKey(Schema.String),
+  }).annotate({ identifier: "TestModelError" }),
+]).annotate({ identifier: "TestModelResult" })
+
 export const ProviderApi = HttpApi.make("provider")
   .add(
     HttpApiGroup.make("provider")
@@ -79,6 +145,35 @@ export const ProviderApi = HttpApi.make("provider")
             identifier: "provider.oauth.callback",
             summary: "Handle OAuth callback",
             description: "Handle the OAuth callback from a provider after user authorization.",
+          }),
+        ),
+        HttpApiEndpoint.post("discover", `${root}/discover`, {
+          query: WorkspaceRoutingQuery,
+          payload: DiscoverModelsPayload,
+          success: described(DiscoverModelsResult, "Discovered model IDs or error"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "provider.discover",
+            summary: "Discover models from an OpenAI-compatible base URL",
+            description:
+              "Probe an OpenAI-compatible endpoint at `{baseURL}/v1/models` and return the list of model IDs. " +
+              "Resolves env-var API keys on the server and bypasses browser CORS. Loopback and LAN hosts stay " +
+              "reachable so local runtimes can be discovered; cloud instance-metadata endpoints are blocked. " +
+              "Requires the same authorization as config writes.",
+          }),
+        ),
+        HttpApiEndpoint.post("test", `${root}/test`, {
+          query: WorkspaceRoutingQuery,
+          payload: TestModelPayload,
+          success: described(TestModelResult, "Model connectivity and latency result"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "provider.test",
+            summary: "Send a probe request to one model",
+            description:
+              "Send a single short prompt to a configured model and report time to first token, total time, " +
+              "token usage, and the reply text. A failed probe is returned as data with a classified reason so " +
+              "the UI can distinguish a bad credential from an unreachable endpoint.",
           }),
         ),
       )

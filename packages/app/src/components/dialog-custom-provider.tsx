@@ -1,4 +1,5 @@
 import { Button } from "@opencode-ai/ui/button"
+import { Checkbox } from "@opencode-ai/ui/checkbox"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { IconButton } from "@opencode-ai/ui/icon-button"
@@ -6,16 +7,37 @@ import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { useMutation } from "@tanstack/solid-query"
 import { TextField } from "@opencode-ai/ui/text-field"
 import { showToast } from "@/utils/toast"
-import { batch, For } from "solid-js"
+import { batch, For, Show } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { ExternalLink } from "@/components/external-link"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
-import { type FormState, headerRow, modelRow, validateCustomProvider } from "./dialog-custom-provider-form"
+import {
+  type FormState,
+  type Modality,
+  MODALITIES,
+  headerRow,
+  modelRow,
+  validateCustomProvider,
+} from "./dialog-custom-provider-form"
 
 type Props = {
   onBack: () => void
+}
+
+const CAPABILITY_TOGGLES = [
+  { key: "reasoning", label: "model.tooltip.reasoning" },
+  { key: "attachment", label: "provider.custom.models.capability.attachment" },
+  { key: "temperature", label: "provider.custom.models.capability.temperature" },
+  { key: "toolCall", label: "provider.custom.models.capability.toolCall" },
+] as const
+
+const MODALITY_LABELS: Record<Modality, string> = {
+  image: "model.input.image",
+  audio: "model.input.audio",
+  video: "model.input.video",
+  pdf: "model.input.pdf",
 }
 
 export function DialogCustomProvider(props: Props) {
@@ -105,6 +127,34 @@ export function CustomProviderForm(props: { autofocus?: boolean } = {}) {
       setForm("models", index, key, value)
       setForm("models", index, "err", key, undefined)
     })
+  }
+
+  const toggleModelFlag = (index: number, key: "reasoning" | "attachment" | "temperature" | "toolCall") => {
+    setForm("models", index, key, (current) => !current)
+  }
+
+  const setModelLimit = (index: number, key: "contextLimit" | "outputLimit", value: string) => {
+    batch(() => {
+      setForm("models", index, key, value)
+      setForm("models", index, "err", "limit", undefined)
+    })
+  }
+
+  const toggleModality = (index: number, modality: Modality) => {
+    setForm(
+      "models",
+      index,
+      "inputModalities",
+      produce((current) => {
+        const at = current.indexOf(modality)
+        if (at === -1) current.push(modality)
+        else current.splice(at, 1)
+      }),
+    )
+  }
+
+  const toggleModelExpanded = (index: number) => {
+    setForm("models", index, "expanded", (current) => !current)
   }
 
   const setHeader = (index: number, key: "key" | "value", value: string) => {
@@ -231,38 +281,120 @@ export function CustomProviderForm(props: { autofocus?: boolean } = {}) {
           <label class="text-12-medium text-text-weak">{language.t("provider.custom.models.label")}</label>
           <For each={form.models}>
             {(m, i) => (
-              <div class="flex gap-2 items-start" data-row={m.row}>
-                <div class="flex-1">
-                  <TextField
-                    label={language.t("provider.custom.models.id.label")}
-                    hideLabel
-                    placeholder={language.t("provider.custom.models.id.placeholder")}
-                    value={m.id}
-                    onChange={(v) => setModel(i(), "id", v)}
-                    validationState={m.err.id ? "invalid" : undefined}
-                    error={m.err.id}
+              <div class="flex flex-col gap-2" data-row={m.row}>
+                <div class="flex gap-2 items-start">
+                  <div class="flex-1">
+                    <TextField
+                      label={language.t("provider.custom.models.id.label")}
+                      hideLabel
+                      placeholder={language.t("provider.custom.models.id.placeholder")}
+                      value={m.id}
+                      onChange={(v) => setModel(i(), "id", v)}
+                      validationState={m.err.id ? "invalid" : undefined}
+                      error={m.err.id}
+                    />
+                  </div>
+                  <div class="flex-1">
+                    <TextField
+                      label={language.t("provider.custom.models.name.label")}
+                      hideLabel
+                      placeholder={language.t("provider.custom.models.name.placeholder")}
+                      value={m.name}
+                      onChange={(v) => setModel(i(), "name", v)}
+                      validationState={m.err.name ? "invalid" : undefined}
+                      error={m.err.name}
+                    />
+                  </div>
+                  <IconButton
+                    type="button"
+                    icon="settings-gear"
+                    variant="ghost"
+                    class="mt-1.5"
+                    active={m.expanded}
+                    onClick={() => toggleModelExpanded(i())}
+                    aria-label={language.t("command.category.settings")}
+                    aria-expanded={m.expanded}
+                  />
+                  <IconButton
+                    type="button"
+                    icon="trash"
+                    variant="ghost"
+                    class="mt-1.5"
+                    onClick={() => removeModel(i())}
+                    disabled={form.models.length <= 1}
+                    aria-label={language.t("provider.custom.models.remove")}
                   />
                 </div>
-                <div class="flex-1">
-                  <TextField
-                    label={language.t("provider.custom.models.name.label")}
-                    hideLabel
-                    placeholder={language.t("provider.custom.models.name.placeholder")}
-                    value={m.name}
-                    onChange={(v) => setModel(i(), "name", v)}
-                    validationState={m.err.name ? "invalid" : undefined}
-                    error={m.err.name}
-                  />
-                </div>
-                <IconButton
-                  type="button"
-                  icon="trash"
-                  variant="ghost"
-                  class="mt-1.5"
-                  onClick={() => removeModel(i())}
-                  disabled={form.models.length <= 1}
-                  aria-label={language.t("provider.custom.models.remove")}
-                />
+                <Show when={m.expanded}>
+                  <div class="flex flex-col gap-4 pl-1 border-l border-border-weak pl-3">
+                    <p class="text-12-regular text-text-weak">{language.t("provider.custom.models.settings.description")}</p>
+
+                    <div class="flex flex-col gap-2">
+                      <span class="text-12-medium text-text-weak">
+                        {language.t("provider.custom.models.capabilities.label")}
+                      </span>
+                      <div class="flex flex-wrap gap-x-5 gap-y-2">
+                        <For each={CAPABILITY_TOGGLES}>
+                          {(toggle) => (
+                            <Checkbox
+                              checked={m[toggle.key]}
+                              onChange={() => toggleModelFlag(i(), toggle.key)}
+                            >
+                              {language.t(toggle.label)}
+                            </Checkbox>
+                          )}
+                        </For>
+                      </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                      <span class="text-12-medium text-text-weak">
+                        {language.t("provider.custom.models.modalities.label")}
+                      </span>
+                      <div class="flex flex-wrap gap-x-5 gap-y-2">
+                        <For each={MODALITIES}>
+                          {(modality) => (
+                            <Checkbox
+                              checked={m.inputModalities.includes(modality)}
+                              onChange={() => toggleModality(i(), modality)}
+                            >
+                              {language.t(MODALITY_LABELS[modality])}
+                            </Checkbox>
+                          )}
+                        </For>
+                      </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                      <span class="text-12-medium text-text-weak">
+                        {language.t("provider.custom.models.limit.label")}
+                      </span>
+                      <div class="flex gap-2 items-start">
+                        <div class="flex-1">
+                          <TextField
+                            label={language.t("model.tooltip.context.label")}
+                            hideLabel
+                            placeholder="128k"
+                            value={m.contextLimit}
+                            onChange={(v) => setModelLimit(i(), "contextLimit", v)}
+                            validationState={m.err.limit ? "invalid" : undefined}
+                            error={m.err.limit}
+                          />
+                        </div>
+                        <div class="flex-1">
+                          <TextField
+                            label={language.t("provider.custom.models.limit.output.label")}
+                            hideLabel
+                            placeholder="32k"
+                            value={m.outputLimit}
+                            onChange={(v) => setModelLimit(i(), "outputLimit", v)}
+                          />
+                        </div>
+                      </div>
+                      <p class="text-12-regular text-text-weak">{language.t("provider.custom.models.limit.description")}</p>
+                    </div>
+                  </div>
+                </Show>
               </div>
             )}
           </For>

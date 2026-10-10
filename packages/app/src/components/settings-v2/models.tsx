@@ -4,6 +4,8 @@ import { Switch } from "@opencode-ai/ui/v2/switch-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
+import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { type Component, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/context/language"
@@ -13,6 +15,12 @@ import { popularProviders } from "@/hooks/use-providers"
 import { Persist, persisted } from "@/utils/persist"
 import { SettingsListV2 } from "./parts/list"
 import { SettingsRowV2 } from "./parts/row"
+import { DiscoverModelsButton } from "../discover-models-button"
+import { TestModelButton } from "../test-model-button"
+import { DialogEditModel } from "../dialog-edit-model"
+import { ModelTooltip } from "../model-tooltip"
+import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
+import { formatModelSummary } from "../model-summary"
 import "./settings-v2.css"
 
 type ModelItem = ReturnType<ReturnType<typeof useModels>["list"]>[number]
@@ -23,6 +31,7 @@ export const SettingsModelsV2: Component = () => {
   const language = useLanguage()
   const models = useModels()
   const serverSdk = useServerSDK()
+  const dialog = useDialog()
   const [store, setStore] = persisted(
     Persist.serverGlobal(serverSdk().scope, "settings-v2.models.providers"),
     createStore({ collapsed: {} as Record<string, boolean> }),
@@ -150,15 +159,54 @@ export const SettingsModelsV2: Component = () => {
                           <span class="settings-v2-section-title">{group.items[0].provider.name}</span>
                         </span>
                       </button>
+                      <DiscoverModelsButton
+                        providerID={group.category}
+                        providerName={group.items[0].provider.name}
+                        class="ml-auto mr-2"
+                      />
                     </h3>
                     <Show when={expanded()}>
                       <SettingsListV2>
                         <For each={group.items}>
                           {(item) => {
                             const key = { providerID: item.provider.id, modelID: item.id }
+                            const summary = formatModelSummary(item)
                             return (
-                              <SettingsRowV2 title={item.name} description="">
-                                <div>
+                              <SettingsRowV2
+                                title={item.name}
+                                description={summary.join(" · ")}
+                              >
+                                <div class="flex items-center gap-2">
+                                  <IconButtonV2
+                                    type="button"
+                                    variant="ghost-muted"
+                                    size="small"
+                                    onClick={() =>
+                                      // Layered over the settings dialog rather than
+                                      // replacing it, so saving returns to the list.
+                                      void dialog.push(() => (
+                                        <DialogEditModel
+                                          providerID={item.provider.id}
+                                          modelID={item.id}
+                                          modelName={item.name}
+                                        />
+                                      ))
+                                    }
+                                    icon={<IconV2 name="outline-sliders" />}
+                                    aria-label={language.t("dialog.model.edit.action", { model: item.name })}
+                                  />
+                                  <TooltipV2
+                                    value={<ModelTooltip model={item} v2 />}
+                                    placement="left"
+                                    gutter={8}
+                                  >
+                                    <IconV2 name="status" class="text-v2-icon-icon-muted" />
+                                  </TooltipV2>
+                                  <TestModelButton
+                                    providerID={item.provider.id}
+                                    modelID={item.id}
+                                    modelName={item.name}
+                                  />
                                   <Switch
                                     checked={models.visible(key)}
                                     onChange={(checked) => {

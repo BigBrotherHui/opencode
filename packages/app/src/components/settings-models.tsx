@@ -10,6 +10,7 @@ import { useModels } from "@/context/models"
 import { popularProviders } from "@/hooks/use-providers"
 import { SettingsList } from "./settings-list"
 import { SettingsServerPicker, SettingsServerScope } from "./settings-server-picker"
+import { DiscoverModelsButton } from "./discover-models-button"
 
 type ModelItem = ReturnType<ReturnType<typeof useModels>["list"]>[number]
 
@@ -112,6 +113,11 @@ const SettingsModelsContent: Component = () => {
                   <div class="flex items-center gap-2 pb-2">
                     <ProviderIcon id={group.category} class="size-5 shrink-0 icon-strong-base" />
                     <span class="text-14-medium text-text-strong">{group.items[0].provider.name}</span>
+                    <DiscoverModelsButton
+                      providerID={group.category}
+                      providerName={group.items[0].provider.name}
+                      class="ml-auto"
+                    />
                   </div>
                   <SettingsList>
                     <For each={group.items}>
