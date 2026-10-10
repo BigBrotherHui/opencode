@@ -2,7 +2,6 @@ import { createEffect, Suspense, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { DebugBar } from "@/components/debug-bar"
 import { TabsInfoPopup } from "@/components/help-button"
-import { SessionRail } from "@/components/session-rail"
 import { Titlebar, type TitlebarUpdate } from "@/components/titlebar"
 import { usePlatform } from "@/context/platform"
 import { setV2Toast, ToastRegion } from "@/utils/toast"
@@ -39,12 +38,9 @@ export default function NewLayout(props: ParentProps) {
             : undefined
         }
       />
-      <div class="flex flex-1 min-h-0 min-w-0">
-        <SessionRail />
-        <main class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-strict">
-          <Suspense>{props.children}</Suspense>
-        </main>
-      </div>
+      <main class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-strict">
+        <Suspense>{props.children}</Suspense>
+      </main>
       {import.meta.env.DEV && state.debugTools && <DebugBar inline />}
       <TabsInfoPopup />
       <ToastRegion v2 />
