@@ -1,4 +1,5 @@
 import type { Session } from "@opencode-ai/sdk/v2/client"
+import { base64Encode } from "@opencode-ai/core/util/encode"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { createStore, produce } from "solid-js/store"
 import { Persist, persisted, removePersisted, draftPersistedKeys } from "@/utils/persist"
@@ -40,10 +41,12 @@ type RecentTab = {
   key?: string
 }
 
-export const draftHref = (draftID: string) => `/new-session?draftId=${encodeURIComponent(draftID)}`
+// Drafts live under the directory layout so the sidebar stays visible (codex-style).
+export const draftHref = (draftID: string, directory: string) =>
+  `/${base64Encode(directory)}/new-session?draftId=${encodeURIComponent(draftID)}`
 
 export const tabHref = (tab: Tab) =>
-  tab.type === "draft" ? draftHref(tab.draftID) : sessionHref(tab.server, tab.sessionId)
+  tab.type === "draft" ? draftHref(tab.draftID, tab.directory) : sessionHref(tab.server, tab.sessionId)
 
 export const tabKey = (tab: Tab) => (tab.type === "draft" ? `draft:${tab.draftID}` : `${tab.server}\n${tabHref(tab)}`)
 
@@ -217,7 +220,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
               tabs.push(tab)
             }),
           )
-          navigate(draftHref(draftID))
+          navigate(draftHref(draftID, draft.directory))
         })
         return tab
       },
@@ -232,7 +235,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       promoteDraft(draftID: string, session: Omit<SessionTab, "type">) {
         // Keep the replacement and navigation atomic so /new-session never renders
         // after its backing draft tab has been removed from the store.
-        const active = location.pathname === "/new-session" && location.query.draftId === draftID
+        const active = location.pathname.endsWith("/new-session") && location.query.draftId === draftID
         const next = { type: "session" as const, ...session }
         void startTransition(() => {
           setStore(

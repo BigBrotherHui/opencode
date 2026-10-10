@@ -54,7 +54,7 @@ import { usePlatform } from "@/context/platform"
 import { PromptProvider } from "@/context/prompt"
 import { ServerConnection, ServerProvider, serverName, useServer } from "@/context/server"
 import { SettingsProvider, useSettings } from "@/context/settings"
-import { TabsProvider, useTabs, type DraftTab } from "@/context/tabs"
+import { TabsProvider, useTabs, draftHref, type DraftTab } from "@/context/tabs"
 import { SDKProvider, useSDK } from "@/context/sdk"
 import { WslServersProvider } from "@/wsl/context"
 import DirectoryLayout, { DirectoryDataProvider } from "@/pages/directory-layout"
@@ -67,6 +67,7 @@ import { createSessionLineage } from "@/pages/session/session-lineage"
 
 import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } from "@/pages/session"
 import { NewHome } from "@/pages/home"
+import { createHomeController } from "@/pages/home/home-controller"
 import { LegacyHome } from "@/pages/home/legacy-home"
 
 const NewSession = lazy(() => import("@/pages/new-session"))
@@ -184,7 +185,6 @@ function LegacyServerLayout(props: ParentProps<{ serverScoped?: JSX.Element }>) 
 
 function DraftRoute() {
   const [search] = useSearchParams<{ draftId?: string }>()
-  const settings = useSettings()
   const tabs = useTabs()
   return (
     <Show when={tabs.ready()}>
@@ -193,14 +193,25 @@ function DraftRoute() {
         keyed
         fallback={<Navigate href="/" />}
       >
-        {(draft) => (
-          <Show
-            when={settings.general.newLayoutDesigns()}
-            fallback={<Navigate href={`/${base64Encode(draft.directory)}/session`} />}
-          >
-            <ResolvedDraftRoute draft={draft} />
-          </Show>
-        )}
+        {(draft) => <ResolvedDraftRoute draft={draft} />}
+      </Show>
+    </Show>
+  )
+}
+
+// Legacy standalone draft URL (/new-session) — redirect into the directory
+// layout so the sidebar stays visible.
+function LegacyDraftRoute() {
+  const [search] = useSearchParams<{ draftId?: string }>()
+  const tabs = useTabs()
+  return (
+    <Show when={tabs.ready()}>
+      <Show
+        when={tabs.store.find((tab): tab is DraftTab => tab.type === "draft" && tab.draftID === search.draftId)}
+        keyed
+        fallback={<Navigate href="/" />}
+      >
+        {(draft) => <Navigate href={draftHref(draft.draftID, draft.directory)} />}
       </Show>
     </Show>
   )
@@ -633,15 +644,53 @@ function Routes(props: { serverScoped?: JSX.Element }) {
         <Route path="/:dir" component={DirectoryLayout}>
           <Route path="/" component={() => <Navigate href="session" />} />
           <Route path="/session/:id?" component={SessionRoute} />
+          <Route path="/new-session" component={DraftRoute} />
         </Route>
       </Route>
       <Show when={settings.general.newLayoutDesigns()}>
-        <Route path="/" component={NewHome} />
+        <Route path="/" component={HomeRedirect} />
         <Route path="/:dir/session/:id" component={NewLayoutLegacySessionRedirect} />
         <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
       </Show>
-      <Route path="/new-session" component={DraftRoute} />
+      <Route path="/new-session" component={LegacyDraftRoute} />
     </>
+  )
+}
+
+// Home route is only a landing pad: as soon as a project is available we jump
+// into that project's session layout (sidebar + composer), codex-style.
+// The legacy home view stays as fallback for first-run (no project yet).
+function HomeRedirect() {
+  const home = createHomeController()
+  const sync = useServerSync()
+  const navigate = useNavigate()
+
+  const target = createMemo(() => {
+    const conn = home.server.focused()
+    const project = home.project.newSession()
+    if (!conn || !project) return undefined
+    return project
+  })
+
+  createEffect(() => {
+    const project = target()
+    if (!project) return
+    const ctx = home.server.focusedContext()
+    if (ctx) {
+      ctx.projects.open(project.worktree)
+      ctx.projects.touch(project.worktree)
+    }
+    navigate(`/${base64Encode(project.worktree)}/session`, { replace: true })
+  })
+
+  // Render nothing until the project list has loaded. Rendering the home here
+  // paints it for a frame before the redirect, which shows up as a startup
+  // flash. The home only appears once we know there is no project to open yet
+  // (first run).
+  return (
+    <Show when={!target() && sync.ready}>
+      <NewHome />
+    </Show>
   )
 }
 

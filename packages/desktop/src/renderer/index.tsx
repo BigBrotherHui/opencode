@@ -104,8 +104,8 @@ function setLastActiveUrl(windowID: string, value: string) {
 
 function DesktopMemoryRouter(props: BaseRouterProps & { windowID: string }) {
   const history = createMemoryHistory()
-  const initialUrl = getLastActiveUrl(props.windowID)
-  if (initialUrl !== "/") history.set({ value: initialUrl, replace: true, scroll: false })
+  // Always start on the home (session history) view instead of restoring the
+  // last active URL from the previous run.
   onCleanup(history.listen((value) => setLastActiveUrl(props.windowID, value)))
   return <MemoryRouter {...props} history={history} />
 }

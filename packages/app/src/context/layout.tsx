@@ -149,6 +149,11 @@ export const currentRoute = (pathname: string, search: string): LayoutRoute => {
   const dir = decode64(dirBase64)
   if (!dir) return { type: "home" }
 
+  if (parts[1] === "new-session") {
+    const draftID = new URLSearchParams(search).get("draftId")
+    if (draftID) return { type: "draft", draftID }
+  }
+
   if (parts[1] !== "session") return { type: "home" }
 
   const id = parts[2]
@@ -267,12 +272,12 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       }
     }
 
-    const target = Persist.serverGlobal(serverSdk().scope, "layout", ["layout.v6"])
+    const target = Persist.serverGlobal(serverSdk().scope, "layout", ["layout.v7"])
     const [store, setStore, _, ready] = persisted(
       { ...target, migrate },
       createStore({
         sidebar: {
-          opened: false,
+          opened: true,
           width: DEFAULT_SIDEBAR_WIDTH,
           workspaces: {} as Record<string, boolean>,
           workspacesDefault: false,
