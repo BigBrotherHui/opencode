@@ -688,7 +688,7 @@ function HomeRedirect() {
   // flash. The home only appears once we know there is no project to open yet
   // (first run).
   return (
-    <Show when={!target() && sync.ready}>
+    <Show when={!target() && sync().ready}>
       <NewHome />
     </Show>
   )

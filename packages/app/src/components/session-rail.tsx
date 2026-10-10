@@ -68,7 +68,7 @@ export const SessionRail: Component = () => {
     navigate(`/${sdk().directory}/session`)
   }
 
-  const sessionRow = (session: (typeof sessions)[number]) => {
+  const sessionRow = (session: ReturnType<typeof sessions>[number]) => {
     const active = () => session.id === params.id
     const pinned = () => isPinned(session.id)
     return (
