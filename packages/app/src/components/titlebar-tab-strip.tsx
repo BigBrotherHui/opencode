@@ -32,6 +32,8 @@ function SessionTabSlot(props: {
   onRename: (title: string) => Promise<void>
   onNavigate: (element: HTMLDivElement) => void
   onClose: () => void
+  pinned: () => boolean
+  onTogglePin: () => void
 }) {
   const sortable = useSortable({
     get id() {
@@ -49,6 +51,7 @@ function SessionTabSlot(props: {
       data-titlebar-tab-slot
       data-tab-key={props.id}
       data-active={props.active()}
+      data-pinned={props.pinned() ? "true" : undefined}
       class="relative flex w-56 min-w-7 max-w-56 flex-shrink"
     >
       <TabNavItem
@@ -62,6 +65,8 @@ function SessionTabSlot(props: {
         onRename={props.onRename}
         onNavigate={() => props.onNavigate(ref)}
         onClose={props.onClose}
+        pinned={props.pinned()}
+        onTogglePin={props.onTogglePin}
         active={props.active()}
         forceTruncate={props.forceTruncate}
         dragging={sortable.isDragSource()}
@@ -80,6 +85,8 @@ function SessionTabEntry(props: {
   onVisibleChange: (visible: boolean) => void
   onNavigate: (element: HTMLDivElement) => void
   onClose: () => void
+  pinned: () => boolean
+  onTogglePin: () => void
 }) {
   const tabs = useTabs()
   const language = useLanguage()
@@ -162,6 +169,8 @@ function SessionTabEntry(props: {
         onRename={rename}
         onNavigate={props.onNavigate}
         onClose={props.onClose}
+        pinned={props.pinned}
+        onTogglePin={props.onTogglePin}
       />
     </Show>
   )
@@ -221,6 +230,7 @@ export function TitlebarTabStrip(props: {
   const global = useGlobal()
   const language = useLanguage()
   const command = useCommand()
+  const tabs = useTabs()
   let scrollRef!: HTMLDivElement
   let listRef!: HTMLDivElement
   let resizeFrame: number | undefined
@@ -360,6 +370,8 @@ export function TitlebarTabStrip(props: {
                         props.onNavigate(tab, element)
                       }}
                       onClose={() => props.onClose(tab)}
+                      pinned={() => tabs.isPinned(tab)}
+                      onTogglePin={() => tabs.togglePin(tab)}
                     />
                   )
                 }

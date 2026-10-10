@@ -27,6 +27,8 @@ export function TabNavItem(props: {
   fallbackTitle?: string
   onRename: (title: string) => Promise<void>
   onClose: () => void
+  pinned?: boolean
+  onTogglePin?: () => void
   onNavigate: () => void
   active?: boolean
   forceTruncate?: boolean
@@ -48,6 +50,11 @@ export function TabNavItem(props: {
     event.preventDefault()
     event.stopPropagation()
     props.onClose()
+  }
+  const togglePin = (event: MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    props.onTogglePin?.()
   }
   const global = useGlobal()
   const serverCtx = createMemo(() => {
@@ -286,19 +293,47 @@ export function TabNavItem(props: {
         />
       </MenuV2.Context.Trigger>
 
-      <div data-slot="tab-close">
-        <IconButtonV2
-          size="small"
-          variant="ghost-muted"
-          class="hover-reveal relative z-10 group-hover:opacity-100 group-data-[active=true]:opacity-100 group-data-[editing=true]:opacity-100"
-          onPointerDown={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-          }}
-          onClick={closeTab}
-          icon={<IconV2 name="xmark-small" />}
-          aria-label={language.t("common.closeTab")}
-        />
+      <div data-slot="tab-actions" class="flex items-center">
+        <Show when={props.onTogglePin}>
+          <IconButtonV2
+            size="small"
+            variant="ghost-muted"
+            class="hover-reveal relative z-10 group-hover:opacity-100 group-data-[active=true]:opacity-100"
+            classList={{
+              "opacity-100": props.pinned,
+              // Pinned stays accent-tinted even while idle so it reads at a glance.
+              "text-v2-icon-icon-accent": props.pinned,
+            }}
+            data-pinned={props.pinned ? "true" : undefined}
+            onPointerDown={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+            }}
+            onClick={togglePin}
+            icon={<IconV2 name={props.pinned ? "pin-fill" : "pin"} />}
+            aria-label={
+              props.pinned ? language.t("common.unpinTab") : language.t("common.pinTab")
+            }
+            aria-pressed={props.pinned === true}
+          />
+        </Show>
+        <div data-slot="tab-close">
+          <IconButtonV2
+            size="small"
+            variant="ghost-muted"
+            class="hover-reveal relative z-10 group-hover:opacity-100 group-data-[active=true]:opacity-100 group-data-[editing=true]:opacity-100"
+            // A pinned tab is kept deliberately, so the close affordance is
+            // replaced by the unpin button until the user unpins it.
+            classList={{ "hidden": props.pinned }}
+            onPointerDown={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+            }}
+            onClick={closeTab}
+            icon={<IconV2 name="xmark-small" />}
+            aria-label={language.t("common.closeTab")}
+          />
+        </div>
       </div>
     </div>
   )
@@ -336,7 +371,12 @@ export function TabNavItem(props: {
           <MenuV2.Item disabled={!props.session() || rename.isPending} onSelect={() => setMenu("rename", true)}>
             {language.t("common.rename")}
           </MenuV2.Item>
-          <MenuV2.Item onSelect={props.onClose}>{language.t("common.closeTab")}</MenuV2.Item>
+          <MenuV2.Item onSelect={props.onTogglePin}>
+            {props.pinned ? language.t("common.unpinTab") : language.t("common.pinTab")}
+          </MenuV2.Item>
+          <MenuV2.Item disabled={props.pinned} onSelect={props.onClose}>
+            {language.t("common.closeTab")}
+          </MenuV2.Item>
         </MenuV2.Context.Content>
       </MenuV2.Context.Portal>
     </MenuV2.Context>

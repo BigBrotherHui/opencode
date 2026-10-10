@@ -33,6 +33,7 @@ export type Tab = SessionTab | DraftTab
 export type TabInfo = {
   title?: string
   directory?: string
+  pinned?: boolean
 }
 
 type RecentTab = {
@@ -253,8 +254,30 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       closeTab(index: number) {
         const tab = store[index]
         if (!tab) return
+        // Pinned tabs are deliberate, so a stray close cannot discard one. Only
+        // `removeTab` and the other cleanup paths bypass this.
+        if (info[tabKey(tab)]?.pinned) return
         if (tab.type === "session") updateClosed((stack) => pushClosedTab(stack, tab, index))
         removeTab(index)
+      },
+      isPinned(tab: Tab) {
+        return info[tabKey(tab)]?.pinned === true
+      },
+      // Pinning moves the tab to the front of the store so the strip order needs
+      // no separate pinned-first projection and drag reordering stays coherent.
+      togglePin(tab: Tab) {
+        const key = tabKey(tab)
+        const next = info[key]?.pinned !== true
+        setInfo(key, { ...info[key], pinned: next })
+        if (!next) return
+        const index = store.findIndex((item) => tabKey(item) === key)
+        if (index <= 0) return
+        setStore(
+          produce((tabs) => {
+            const [moved] = tabs.splice(index, 1)
+            if (moved) tabs.unshift(moved)
+          }),
+        )
       },
       reopenClosedTab() {
         if (!closedReady()) {

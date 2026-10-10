@@ -1,7 +1,16 @@
-[data-titlebar-tab] [data-slot="tab-close"] {
+/* The action cluster (pin + close) is positioned as one unit at the tab end so
+   the two controls cannot overlap each other. */
+[data-titlebar-tab] [data-slot="tab-actions"] {
   position: absolute;
   top: 4px;
   inset-inline-end: 4px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 20px;
+}
+
+[data-titlebar-tab] [data-slot="tab-close"] {
   display: flex;
   height: 20px;
   width: 20px;
@@ -31,7 +40,7 @@
   background: linear-gradient(var(--tab-overlay), var(--tab-overlay)), var(--tab-base);
 }
 
-[data-titlebar-tab][data-editing="true"] [data-slot="tab-close"] {
+[data-titlebar-tab][data-editing="true"] [data-slot="tab-actions"] {
   display: none;
 }
 
@@ -69,7 +78,7 @@
 }
 
 [data-titlebar-tab][data-title-overflow="true"]:not([data-editing="true"]) [data-slot="tab-link"] {
-  --tab-title-fade-offset: 4px;
+  --tab-title-fade-offset: 24px;
   -webkit-mask-image: linear-gradient(
     to right,
     black 0,
@@ -108,6 +117,12 @@
   --tab-title-fade-offset: 24px;
 }
 
+/* Pin + close together occupy 40px at the tab end, so the trigger needs more
+   trailing room than the single-button default in tabs.css. */
+[data-titlebar-tab]:not([data-editing="true"]) [data-slot="tab-link"] {
+  padding-inline-end: 44px;
+}
+
 [data-titlebar-tab][data-title-overflow="true"]:not(:hover):not([data-active="true"]):not([data-editing="true"])
   [data-slot="tab-link"] {
   padding-inline-end: 0;
@@ -142,7 +157,7 @@
     display: none;
   }
 
-  [data-slot="tab-close"] {
+  [data-slot="tab-actions"] {
     right: auto;
     left: 50%;
     transform: translateX(-50%);
