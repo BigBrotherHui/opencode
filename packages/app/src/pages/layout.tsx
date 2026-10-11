@@ -311,6 +311,16 @@ export default function LegacyLayout(props: ParentProps) {
     setState("autoselect", false)
   })
 
+  // A directory URL can be the very first thing a browser opens (phone deep link,
+  // bookmark). Register it so the sidebar shows the project instead of an empty
+  // list with no way back to it.
+  createEffect(() => {
+    const directory = currentDir()
+    if (!directory) return
+    if (layout.projects.list().some((project) => pathKey(project.worktree) === pathKey(directory))) return
+    layout.projects.open(directory)
+  })
+
   const editorOpen = editor.editorOpen
   const openEditor = editor.openEditor
   const closeEditor = editor.closeEditor
@@ -903,6 +913,22 @@ export default function LegacyLayout(props: ParentProps) {
         category: language.t("command.category.view"),
         keybind: "mod+b",
         onSelect: () => layout.sidebar.toggle(),
+      },
+      {
+        // The drawer only exists in this layout, so narrow-viewport entry points
+        // (the titlebar menu button) reach it through the command bus.
+        id: "sidebar.mobile.toggle",
+        title: language.t("sidebar.menu.toggle"),
+        category: language.t("command.category.view"),
+        hidden: true,
+        onSelect: () => layout.mobileSidebar.toggle(),
+      },
+      {
+        id: "sidebar.mobile.close",
+        title: language.t("sidebar.menu.toggle"),
+        category: language.t("command.category.view"),
+        hidden: true,
+        onSelect: () => layout.mobileSidebar.hide(),
       },
       {
         id: "project.open",

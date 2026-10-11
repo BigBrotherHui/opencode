@@ -352,6 +352,14 @@ export function Titlebar(props: { update?: TitlebarUpdate; debugTools?: { visibl
                 <Show when={windows() || linux()}>
                   <WindowsAppMenu command={command} platform={platform} variant="v2" />
                 </Show>
+                <Button
+                  variant="ghost"
+                  class="group/sidebar-toggle titlebar-icon w-8 h-6 p-0 box-border xl:hidden"
+                  onClick={() => command.trigger("sidebar.mobile.toggle")}
+                  aria-label={language.t("sidebar.menu.toggle")}
+                >
+                  <Icon size="small" name="menu" />
+                </Button>
                 <div class="flex-1" />
                 <TitlebarV2Right state={v2RightState()} />
               </div>
