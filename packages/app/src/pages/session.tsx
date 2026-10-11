@@ -82,7 +82,6 @@ import {
   sessionPanelWidthMax,
 } from "@/pages/session/session-panel-width"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
-import { SessionRail } from "@/components/session-rail"
 import { sessionPanelLayout } from "@/pages/session/session-panel-layout"
 import { SessionReviewEmptyChangesV2 } from "@opencode-ai/session-ui/v2/session-review-empty-changes-v2"
 import { SessionReviewEmptyNoGitV2 } from "@opencode-ai/session-ui/v2/session-review-empty-no-git-v2"
@@ -327,17 +326,7 @@ function SessionProviders(props: ParentProps) {
   )
 }
 
-function SessionRouteFrame(props: ParentProps<{ padded?: boolean; rail?: boolean }>) {
-  // The rail lives here rather than in the layout shell because the session
-  // contexts (sync, sdk, tabs) only exist inside the route.
-  if (props.rail) {
-    return (
-      <div class="relative size-full overflow-hidden flex flex-row">
-        <SessionRail />
-        <div class="flex-1 min-w-0 min-h-0 flex flex-col">{props.children}</div>
-      </div>
-    )
-  }
+export function SessionRouteFrame(props: ParentProps<{ padded?: boolean }>) {
   return (
     <div class="relative size-full overflow-hidden flex flex-col" classList={{ "p-2": props.padded }}>
       {props.children}
@@ -2258,7 +2247,7 @@ export default function Page() {
   )
 
   return (
-    <SessionRouteFrame rail>
+    <SessionRouteFrame>
       <SessionHeader />
       <div
         ref={panelRow}

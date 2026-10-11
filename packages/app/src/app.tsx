@@ -62,7 +62,7 @@ import LegacyLayout from "@/pages/layout"
 import NewLayout from "@/pages/layout-new"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
-import { legacySessionHref, legacySessionServer, requireServerKey, sessionHref } from "./utils/session-route"
+import { legacySessionHref, requireServerKey } from "./utils/session-route"
 import { createSessionLineage } from "@/pages/session/session-lineage"
 
 import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } from "@/pages/session"
@@ -80,17 +80,9 @@ const SessionRoute = () => {
   const server = useServer()
   const tabs = useTabs()
 
-  if (params.id && settings.general.newLayoutDesigns()) {
-    const sessionID = params.id
-    return (
-      <Show when={tabs.ready()}>
-        {(_) => {
-          const persisted = tabs.store.filter((item) => item.type === "session")
-          return <Navigate href={sessionHref(legacySessionServer(persisted, sessionID, server.key), sessionID)} />
-        }}
-      </Show>
-    )
-  }
+  // Sessions render in place under the directory layout so the project sidebar
+  // stays visible and only the right-hand pane swaps. Cross-server sessions
+  // still go through /server/:key/session/:id.
 
   // When the new layout is enabled, the legacy new-session route (/:dir/session with no id)
   // is replaced by a draft at /new-session?draftId=…
@@ -649,7 +641,6 @@ function Routes(props: { serverScoped?: JSX.Element }) {
       </Route>
       <Show when={settings.general.newLayoutDesigns()}>
         <Route path="/" component={HomeRedirect} />
-        <Route path="/:dir/session/:id" component={NewLayoutLegacySessionRedirect} />
         <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={LegacyDraftRoute} />
@@ -690,27 +681,6 @@ function HomeRedirect() {
   return (
     <Show when={!target() && sync().ready}>
       <NewHome />
-    </Show>
-  )
-}
-
-function NewLayoutLegacySessionRedirect() {
-  const server = useServer()
-  const tabs = useTabs()
-  const params = useParams<{ id: string }>()
-
-  return (
-    <Show when={tabs.ready()}>
-      <Navigate
-        href={sessionHref(
-          legacySessionServer(
-            tabs.store.filter((item) => item.type === "session"),
-            params.id,
-            server.key,
-          ),
-          params.id,
-        )}
-      />
     </Show>
   )
 }
