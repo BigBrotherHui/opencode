@@ -904,6 +904,7 @@ export const dict = {
   "session.rail.title": "会话",
   "session.rail.empty": "还没有会话",
   "session.rail.untitled": "未命名",
+  "session.rail.running": "进行中",
   "session.rail.expand": "展开会话列表",
   "session.rail.collapse": "折叠会话列表",
   "common.pinTab": "固定标签页",

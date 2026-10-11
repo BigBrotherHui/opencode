@@ -869,6 +869,7 @@ export const dict = {
   "session.rail.title": "Sessions",
   "session.rail.empty": "No sessions yet",
   "session.rail.untitled": "Untitled",
+  "session.rail.running": "Running",
   "session.rail.expand": "Expand session list",
   "session.rail.collapse": "Collapse session list",
   "common.pinTab": "Pin tab",

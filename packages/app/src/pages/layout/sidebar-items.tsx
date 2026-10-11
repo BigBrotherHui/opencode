@@ -87,6 +87,11 @@ export type SessionItemProps = {
   clearHoverProjectSoon: () => void
   prefetchSession: (session: Session, priority?: "high" | "low") => void
   archiveSession: (session: Session) => Promise<void>
+  /** Present when the list supports drag reordering. */
+  sortableRef?: (element: Element | undefined) => void
+  dragging?: boolean
+  pinned?: boolean
+  onTogglePin?: () => void
 }
 
 const SessionRow = (props: {
@@ -109,6 +114,7 @@ const SessionRow = (props: {
   return (
     <A
       href={`/${props.slug}/session/${props.session.id}`}
+      draggable={false}
       class={`flex items-center gap-2 min-w-0 w-full text-left focus:outline-none ${props.dense ? "py-0.5" : "py-1"}`}
       onPointerDown={props.warmPress}
       onFocus={props.warmFocus}
@@ -172,6 +178,12 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
     messageAgentColor(serverSync().session.data.message[props.session.id], sessionStore.agent),
   )
   const tooltip = createMemo(() => props.showTooltip ?? (props.mobile || !props.sidebarExpanded()))
+  // The hover-revealed action area holds pin + archive, so it needs twice the
+  // width once a list opts into pinning.
+  const actionWidth = () => (props.onTogglePin ? "w-12" : "w-6")
+  const actionHoverWidth = () => (props.onTogglePin ? "group-hover/session:w-12" : "group-hover/session:w-6")
+  const actionFocusWidth = () =>
+    props.onTogglePin ? "group-focus-within/session:w-12" : "group-focus-within/session:w-6"
   const currentChild = createMemo(() => {
     if (!props.showChild) return
     return childSessionOnPath(sessionStore.session, props.session.id, params.id)
@@ -218,8 +230,10 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
   return (
     <>
       <div
+        ref={(element: Element) => props.sortableRef?.(element)}
         data-session-id={props.session.id}
         class="group/session relative w-full min-w-0 rounded-md cursor-default pr-3 transition-colors hover:bg-surface-raised-base-hover [&:has(:focus-visible)]:bg-surface-raised-base-hover has-[[data-expanded]]:bg-surface-raised-base-hover has-[.active]:bg-surface-base-active"
+        classList={{ "opacity-60": props.dragging === true }}
         style={{ "padding-left": `${8 + (props.level ?? 0) * 16}px` }}
       >
         <div class="flex min-w-0 items-center gap-1">
@@ -245,12 +259,30 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
             <div
               class="shrink-0 overflow-hidden transition-[width,opacity]"
               classList={{
-                "w-6 opacity-100 pointer-events-auto": !!props.mobile,
-                "w-0 opacity-0 pointer-events-none": !props.mobile,
-                "group-hover/session:w-6 group-hover/session:opacity-100 group-hover/session:pointer-events-auto": true,
-                "group-focus-within/session:w-6 group-focus-within/session:opacity-100 group-focus-within/session:pointer-events-auto": true,
+                [actionWidth()]: !!props.mobile || !!props.pinned,
+                "w-0 opacity-0 pointer-events-none": !props.mobile && !props.pinned,
+                [actionHoverWidth()]: true,
+                [actionFocusWidth()]: true,
+                "group-hover/session:opacity-100 group-hover/session:pointer-events-auto": true,
+                "group-focus-within/session:opacity-100 group-focus-within/session:pointer-events-auto": true,
               }}
             >
+              <Show when={props.onTogglePin}>
+                <Tooltip value={language.t(props.pinned ? "common.unpinTab" : "common.pinTab")} placement="top">
+                  <IconButton
+                    icon={props.pinned ? "pin-fill" : "pin"}
+                    variant="ghost"
+                    class="size-6 rounded-md"
+                    aria-label={language.t(props.pinned ? "common.unpinTab" : "common.pinTab")}
+                    aria-pressed={props.pinned}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      props.onTogglePin?.()
+                    }}
+                  />
+                </Tooltip>
+              </Show>
               <Tooltip value={language.t("common.archive")} placement="top">
                 <IconButton
                   icon="archive"

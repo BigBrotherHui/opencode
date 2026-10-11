@@ -2,6 +2,10 @@ import { useNavigate, useParams } from "@solidjs/router"
 import { createEffect, createMemo, For, Show, type Accessor, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createSortable } from "@thisbeyond/solid-dnd"
+import { DragDropProvider, PointerSensor } from "@dnd-kit/solid"
+import { isSortable, useSortable } from "@dnd-kit/solid/sortable"
+import { Accessibility, AutoScroller, Feedback, PointerActivationConstraints } from "@dnd-kit/dom"
+import { RestrictToVerticalAxis } from "@dnd-kit/abstract/modifiers"
 import { createMediaQuery } from "@solid-primitives/media"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { getFilename } from "@opencode-ai/core/util/path"
@@ -19,7 +23,8 @@ import { type LocalProject } from "@/context/layout"
 import { useServerSync, useQueryOptions } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { pathKey } from "@/utils/path-key"
-import { NewSessionItem, SessionItem, SessionSkeleton } from "./sidebar-items"
+import { NewSessionItem, SessionItem, SessionSkeleton, type SessionItemProps } from "./sidebar-items"
+import { Persist, persisted } from "@/utils/persist"
 import { sortedRootSessions } from "./helpers"
 import { useIsFetching } from "@tanstack/solid-query"
 
@@ -236,6 +241,27 @@ const WorkspaceActions = (props: {
   </div>
 )
 
+/** One sortable row. Kept separate so the hooks run per item. */
+const SortableSessionItem = (props: { item: SessionItemProps; index: () => number }): JSX.Element => {
+  const sortable = useSortable({
+    get id() {
+      return props.item.session.id
+    },
+    get index() {
+      return props.index()
+    },
+  })
+
+  return <SessionItem {...props.item} sortableRef={sortable.ref} dragging={sortable.isDragSource()} />
+}
+
+const moveItem = <T,>(list: T[], from: number, to: number) => {
+  const next = [...list]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item)
+  return next
+}
+
 const WorkspaceSessionList = (props: {
   slug: Accessor<string>
   mobile?: boolean
@@ -246,52 +272,118 @@ const WorkspaceSessionList = (props: {
   hasMore: Accessor<boolean>
   loadMore: () => Promise<void>
   language: ReturnType<typeof useLanguage>
-}): JSX.Element => (
-  <nav class="flex flex-col gap-1">
-    <Show when={props.showNew()}>
-      <NewSessionItem
-        slug={props.slug()}
-        mobile={props.mobile}
-        sidebarExpanded={props.ctx.sidebarExpanded}
-        clearHoverProjectSoon={props.ctx.clearHoverProjectSoon}
-      />
-    </Show>
-    <Show when={props.loading()}>
-      <SessionSkeleton />
-    </Show>
-    <For each={props.sessions()}>
-      {(session) => (
-        <SessionItem
-          session={session}
-          list={props.sessions()}
-          navList={props.ctx.navList}
+}): JSX.Element => {
+  const [pins, setPins] = persisted(Persist.window("session-rail.pins"), createStore<Record<string, boolean>>({}))
+  const [orderStore, setOrder] = persisted(
+    Persist.window("session-rail.order"),
+    createStore<{ ids: string[] }>({ ids: [] }),
+  )
+
+  const rank = createMemo(() => new Map(orderStore.ids.map((id, index) => [id, index])))
+  const isPinned = (id: string) => pins[id] === true
+
+  /** Manual order wins; anything not ordered yet falls back to newest first. */
+  const arrange = (list: Session[]) =>
+    [...list].sort((a, b) => {
+      const left = rank().get(a.id)
+      const right = rank().get(b.id)
+      if (left !== undefined && right !== undefined) return left - right
+      if (left !== undefined) return -1
+      if (right !== undefined) return 1
+      return (b.time?.created ?? 0) - (a.time?.created ?? 0)
+    })
+
+  const pinned = createMemo(() => arrange(props.sessions().filter((session) => isPinned(session.id))))
+  const rest = createMemo(() => arrange(props.sessions().filter((session) => !isPinned(session.id))))
+
+  const reorder = (from: number, to: number) => {
+    if (from === to) return
+    setOrder(
+      "ids",
+      moveItem(
+        rest().map((session) => session.id),
+        from,
+        to,
+      ),
+    )
+  }
+
+  const itemProps = (session: Session, list: Session[]): SessionItemProps => ({
+    session,
+    list,
+    navList: props.ctx.navList,
+    slug: props.slug(),
+    mobile: props.mobile,
+    showChild: true,
+    sidebarExpanded: props.ctx.sidebarExpanded,
+    clearHoverProjectSoon: props.ctx.clearHoverProjectSoon,
+    prefetchSession: props.ctx.prefetchSession,
+    archiveSession: props.ctx.archiveSession,
+    pinned: isPinned(session.id),
+    onTogglePin: () => setPins(session.id, !isPinned(session.id)),
+  })
+
+  return (
+    <nav class="flex flex-col gap-1">
+      <Show when={props.showNew()}>
+        <NewSessionItem
           slug={props.slug()}
           mobile={props.mobile}
-          showChild
           sidebarExpanded={props.ctx.sidebarExpanded}
           clearHoverProjectSoon={props.ctx.clearHoverProjectSoon}
-          prefetchSession={props.ctx.prefetchSession}
-          archiveSession={props.ctx.archiveSession}
         />
-      )}
-    </For>
-    <Show when={props.hasMore()}>
-      <div class="relative w-full py-1">
-        <Button
-          variant="ghost"
-          class="flex w-full text-left justify-start text-14-regular text-text-weak pl-2 pr-10"
-          size="large"
-          onClick={(e: MouseEvent) => {
-            void props.loadMore()
-            ;(e.currentTarget as HTMLButtonElement).blur()
-          }}
-        >
-          {props.language.t("common.loadMore")}
-        </Button>
-      </div>
-    </Show>
-  </nav>
-)
+      </Show>
+      <Show when={props.loading()}>
+        <SessionSkeleton />
+      </Show>
+      <Show when={pinned().length > 0}>
+        <For each={pinned()}>{(session) => <SessionItem {...itemProps(session, pinned())} />}</For>
+        <div class="my-0.5 border-t border-border-weak-base" />
+      </Show>
+      <DragDropProvider
+        sensors={[
+          PointerSensor.configure({
+            activationConstraints: [new PointerActivationConstraints.Distance({ value: 4 })],
+            // Only bail out on real controls (pin/archive buttons). Do not match
+            // on `[aria-label]`: the sidebar nav that wraps this list carries one,
+            // so an ancestor lookup would disable dragging everywhere.
+            preventActivation: (event) =>
+              event.target instanceof Element &&
+              !!event.target.closest('button,input,textarea,select,[contenteditable="true"]'),
+          }),
+        ]}
+        modifiers={[RestrictToVerticalAxis]}
+        plugins={(defaults) => [
+          ...defaults.filter((plugin) => plugin !== Accessibility),
+          AutoScroller.configure({ acceleration: 8, threshold: { x: 0, y: 0.05 } }),
+          Feedback.configure({ dropAnimation: null }),
+        ]}
+        onDragEnd={(event) => {
+          const source = event.operation.source
+          if (event.canceled || !isSortable(source)) return
+          reorder(source.initialIndex, source.index)
+        }}
+      >
+        <For each={rest()}>{(session, index) => <SortableSessionItem item={itemProps(session, rest())} index={index} />}</For>
+      </DragDropProvider>
+      <Show when={props.hasMore()}>
+        <div class="relative w-full py-1">
+          <Button
+            variant="ghost"
+            class="flex w-full text-left justify-start text-14-regular text-text-weak pl-2 pr-10"
+            size="large"
+            onClick={(e: MouseEvent) => {
+              void props.loadMore()
+              ;(e.currentTarget as HTMLButtonElement).blur()
+            }}
+          >
+            {props.language.t("common.loadMore")}
+          </Button>
+        </div>
+      </Show>
+    </nav>
+  )
+}
 
 export const SortableWorkspace = (props: {
   ctx: WorkspaceSidebarContext
