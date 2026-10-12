@@ -9,7 +9,7 @@ import { useLocation, useNavigate, useParams } from "@solidjs/router"
 import { usePlatform } from "./platform"
 import { uuid } from "@/utils/uuid"
 import { SessionTabsRemovedDetail } from "@/components/titlebar-session-events"
-import { sessionHref } from "@/utils/session-route"
+import { legacySessionHref, sessionHref } from "@/utils/session-route"
 import { createTabMemory } from "./tab-memory"
 import { nextTabAfterClose, pushClosedTab, removeClosedTabs, takeClosedTab, type ClosedTab } from "./closed-tabs"
 import { createDraftPromptSession, type PromptModel } from "./prompt-state"
@@ -237,6 +237,12 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
         // after its backing draft tab has been removed from the store.
         const active = location.pathname.endsWith("/new-session") && location.query.draftId === draftID
         const next = { type: "session" as const, ...session }
+        // The draft carries the directory the session belongs to. Navigate to the
+        // directory-scoped URL instead of the default /server/... href: the legacy
+        // layout derives its sidebar project from the `:dir` segment, so a
+        // server-scoped URL would drop the sidebar session history right after the
+        // first message is sent.
+        const draft = store.find((tab): tab is DraftTab => tab.type === "draft" && tab.draftID === draftID)
         void startTransition(() => {
           setStore(
             produce((tabs) => {
@@ -245,7 +251,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
             }),
           )
           if (recent.key === `draft:${draftID}`) setRecentKey(tabKey(next))
-          if (active) navigateTab(next)
+          if (active) navigate(draft ? legacySessionHref(draft.directory, session.sessionId) : tabHref(next))
         })
         memory.remove(`draft:${draftID}`)
         removeDraftPersisted(draftID)
