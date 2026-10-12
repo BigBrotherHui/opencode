@@ -12,6 +12,7 @@ import { normalizeProjectInfo } from "./global-sync/utils"
 import { Persist, persisted, removePersisted } from "@/utils/persist"
 import { pathKey } from "@/utils/path-key"
 import { decode64 } from "@/utils/base64"
+import { base64Encode } from "@opencode-ai/core/util/encode"
 import { same } from "@/utils/same"
 import { createScrollPersistence, type SessionScroll } from "./layout-scroll"
 import { createPathHelpers } from "./file/path"
@@ -91,7 +92,7 @@ export type ReviewPanelSource = "context-button" | "other"
 
 export type LayoutRoute =
   | { type: "home" }
-  | { type: "draft"; draftID: string; server?: ServerConnection.Key }
+  | { type: "draft"; draftID: string; dir: string; dirBase64: string; server?: ServerConnection.Key }
   | { type: "dir-new-sesssion"; dir: string; dirBase64: string; server?: ServerConnection.Key }
   | { type: "session"; sessionId: string; server?: ServerConnection.Key }
 
@@ -134,7 +135,9 @@ export const currentRoute = (pathname: string, search: string): LayoutRoute => {
   if (parts[0] === "new-session") {
     const draftID = new URLSearchParams(search).get("draftId")
     if (!draftID) return { type: "home" }
-    return { type: "draft", draftID }
+    // Standalone draft URL. The directory is unknown here; the provider fills it
+    // in from the draft tab so the sidebar can still resolve the project.
+    return { type: "draft", draftID, dir: "", dirBase64: "" }
   }
 
   if (parts[0] === "server" && parts[2] === "session" && parts[3]) {
@@ -151,7 +154,7 @@ export const currentRoute = (pathname: string, search: string): LayoutRoute => {
 
   if (parts[1] === "new-session") {
     const draftID = new URLSearchParams(search).get("draftId")
-    if (draftID) return { type: "draft", draftID }
+    if (draftID) return { type: "draft", draftID, dir, dirBase64 }
   }
 
   if (parts[1] !== "session") return { type: "home" }
@@ -177,7 +180,13 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       if (value.server) return value
       if (value.type === "draft") {
         const draft = tabs.store.find((tab): tab is DraftTab => tab.type === "draft" && tab.draftID === value.draftID)
-        if (draft) return { ...value, server: draft.server }
+        if (draft) {
+          // The standalone /new-session URL carries no directory segment, so take
+          // it from the draft tab. Without this the sidebar cannot resolve which
+          // project the draft belongs to and renders no session history.
+          const resolved = value.dir ? value : { ...value, dir: draft.directory, dirBase64: base64Encode(draft.directory) }
+          return { ...resolved, server: draft.server }
+        }
       }
       return { ...value, server: server.key }
     })
