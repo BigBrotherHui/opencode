@@ -11,6 +11,7 @@ import { base64Encode } from "@opencode-ai/core/util/encode"
 import { decode64 } from "@/utils/base64"
 import { EventSessionError } from "@opencode-ai/sdk/v2"
 import { Persist, persisted } from "@/utils/persist"
+import { syncPushSubscription } from "@/utils/push"
 import { playSoundById } from "@/utils/sound"
 import { useGlobal } from "./global"
 import { ServerConnection, useServer } from "./server"
@@ -135,6 +136,11 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
     })
     const activeDirectory = createMemo(() => decode64(params.dir))
     const activeSession = createMemo(() => params.id)
+
+    createEffect(() => {
+      if (platform.platform === "desktop") return
+      void syncPushSubscription(settings.notifications.agent())
+    })
 
     const ensure = (key: ServerConnection.Key) => {
       const conn = global.servers.list().find((item) => ServerConnection.key(item) === key)

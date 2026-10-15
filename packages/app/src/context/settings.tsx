@@ -24,6 +24,7 @@ export interface Settings {
     autoSave: boolean
     releaseNotes: boolean
     followup: "queue" | "steer"
+    followupChosen?: boolean
     showFileTree: boolean
     showNavigation: boolean
     showSearch: boolean
@@ -184,7 +185,7 @@ const defaultSettings: Settings = {
   general: {
     autoSave: true,
     releaseNotes: true,
-    followup: "steer",
+    followup: "queue",
     showFileTree: false,
     showNavigation: false,
     showSearch: false,
@@ -350,9 +351,12 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
       root.style.setProperty("--font-family-sans", sansFontFamily(store.appearance?.sans))
     })
 
+    // Legacy persisted stores carry followup:"steer" from the old default or the
+    // removed force-migration; flip once unless the user picked a value in the UI.
     createEffect(() => {
-      if (store.general?.followup !== "queue") return
-      setStore("general", "followup", "steer")
+      if (store.general?.followupChosen === true) return
+      if (store.general?.followup !== "steer") return
+      setStore("general", "followup", "queue")
     })
 
     return {
@@ -369,12 +373,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         setReleaseNotes(value: boolean) {
           setStore("general", "releaseNotes", value)
         },
-        followup: withFallback(
-          () => (store.general?.followup === "queue" ? "steer" : store.general?.followup),
-          defaultSettings.general.followup,
-        ),
+        followup: withFallback(() => store.general?.followup, defaultSettings.general.followup),
         setFollowup(value: "queue" | "steer") {
-          setStore("general", "followup", value === "queue" ? "steer" : value)
+          setStore("general", "followup", value)
+          setStore("general", "followupChosen", true)
         },
         showFileTree,
         setShowFileTree(value: boolean) {

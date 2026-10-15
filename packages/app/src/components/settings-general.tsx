@@ -29,6 +29,7 @@ import {
 } from "@/context/settings"
 import { decode64 } from "@/utils/base64"
 import { playSoundById, SOUND_OPTIONS } from "@/utils/sound"
+import { requestPushPermission, syncPushSubscription } from "@/utils/push"
 import { ExternalLink } from "./external-link"
 import { SettingsList } from "./settings-list"
 
@@ -207,6 +208,11 @@ export const SettingsGeneral: Component = () => {
     { value: "system", label: language.t("theme.scheme.system") },
     { value: "light", label: language.t("theme.scheme.light") },
     { value: "dark", label: language.t("theme.scheme.dark") },
+  ])
+
+  const followupOptions = createMemo((): { value: "queue" | "steer"; label: string }[] => [
+    { value: "queue", label: language.t("settings.general.row.followup.option.queue") },
+    { value: "steer", label: language.t("settings.general.row.followup.option.steer") },
   ])
 
   const languageOptions = createMemo(() =>
@@ -570,6 +576,24 @@ export const SettingsGeneral: Component = () => {
             />
           </div>
         </SettingsRow>
+
+        <SettingsRow
+          title={language.t("settings.general.row.followup.title")}
+          description={language.t("settings.general.row.followup.description")}
+        >
+          <Select
+            data-action="settings-followup"
+            options={followupOptions()}
+            current={followupOptions().find((o) => o.value === settings.general.followup())}
+            value={(o) => o.value}
+            label={(o) => o.label}
+            onSelect={(option) => option && settings.general.setFollowup(option.value)}
+            variant="secondary"
+            size="small"
+            triggerVariant="settings"
+            triggerStyle={{ "min-width": "180px" }}
+          />
+        </SettingsRow>
       </SettingsList>
     </div>
   )
@@ -586,7 +610,13 @@ export const SettingsGeneral: Component = () => {
           <div data-action="settings-notifications-agent">
             <Switch
               checked={settings.notifications.agent()}
-              onChange={(checked) => settings.notifications.setAgent(checked)}
+              onChange={(checked) => {
+                settings.notifications.setAgent(checked)
+                if (checked && platform.platform !== "desktop")
+                  void requestPushPermission().then((granted) => {
+                    if (granted) void syncPushSubscription(true)
+                  })
+              }}
             />
           </div>
         </SettingsRow>

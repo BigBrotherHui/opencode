@@ -178,3 +178,7 @@ if (root instanceof HTMLElement) {
     )
   })
 }
+
+if (import.meta.env.PROD && "serviceWorker" in navigator && window.isSecureContext) {
+  void navigator.serviceWorker.register("/sw.js").catch(() => undefined)
+}

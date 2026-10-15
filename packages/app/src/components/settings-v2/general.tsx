@@ -9,6 +9,7 @@ import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useUpdaterAction } from "../updater-action"
 import { useSettings } from "@/context/settings"
+import { requestPushPermission, syncPushSubscription } from "@/utils/push"
 import { ExternalLink } from "../external-link"
 import { SettingsListV2 } from "./parts/list"
 import { SettingsRowV2 } from "./parts/row"
@@ -28,6 +29,7 @@ import {
 import "./settings-v2.css"
 
 const schemeOptions: ("system" | "light" | "dark")[] = ["system", "light", "dark"]
+const followupOptions: ("queue" | "steer")[] = ["queue", "steer"]
 const fontSettings = {
   ui: {
     action: "settings-ui-font",
@@ -334,6 +336,28 @@ export const SettingsGeneralV2: Component<{
         <ShellSetting controller={shell} />
 
         <SettingsRowV2
+          title={language.t("settings.general.row.followup.title")}
+          description={language.t("settings.general.row.followup.description")}
+        >
+          <SelectV2
+            appearance="inline"
+            data-action="settings-followup"
+            options={followupOptions}
+            current={followupOptions.find((option) => option === settings.general.followup())}
+            placement="bottom-end"
+            gutter={6}
+            label={(option) =>
+              language.t(
+                option === "queue"
+                  ? "settings.general.row.followup.option.queue"
+                  : "settings.general.row.followup.option.steer",
+              )
+            }
+            onSelect={(option) => option && settings.general.setFollowup(option)}
+          />
+        </SettingsRowV2>
+
+        <SettingsRowV2
           title={language.t("settings.general.row.reasoningSummaries.title")}
           description={language.t("settings.general.row.reasoningSummaries.description")}
         >
@@ -454,7 +478,13 @@ export const SettingsGeneralV2: Component<{
           <div data-action="settings-notifications-agent">
             <Switch
               checked={settings.notifications.agent()}
-              onChange={(checked) => settings.notifications.setAgent(checked)}
+              onChange={(checked) => {
+                settings.notifications.setAgent(checked)
+                if (checked && platform.platform !== "desktop")
+                  void requestPushPermission().then((granted) => {
+                    if (granted) void syncPushSubscription(true)
+                  })
+              }}
             />
           </div>
         </SettingsRowV2>

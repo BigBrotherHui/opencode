@@ -178,3 +178,68 @@ rail 底部（栅格列之下）加 `arrow-down-to-line` 按钮，点击复用 `
 
 **部署（已完成）：** `packages/app/dist` 已重建（主 bundle `index-FMUG29nF.js`，sourcemap 含 `projectSyncs`/`input.syncs?.get`，3000 已服务新 bundle）；桌面 App 已按第六次流程重打包（`bunx electron-vite build` → 停 7 个 `OpenCode Dev` → `bunx electron-builder --win --dir --config electron-builder.config.ts` → 解包 asar 确认含修复代码 → 重启 6 进程）。API :3910 200。
 
+
+## 2026-10-15 — 侧栏项目右键菜单加「在文件资源管理器中显示」
+
+**需求：** 左侧项目栏的项目右键菜单里加一项，在文件管理器（Explorer）中打开项目文件夹。
+
+**实现：** `packages/app/src/pages/layout/sidebar-project.tsx` 的 `ProjectTile`（项目图标右键 ContextMenu）加 `ContextMenu.Item`，动作调 `platform.openPath(project.worktree)`。门控与主页「Reveal in File Explorer」一致：`canReveal = platform==="desktop" && !!platform.openPath && server.isLocal()`；标签复用 `fileManagerApp(os).actionLabel`（Windows=「在文件资源管理器中显示」），失败 toast 复用主页同款 `common.requestFailed` + `errorMessage`。菜单顺序：Edit / **Reveal** / Workspaces / Clear / Close。手机（web）平台不显示该项（`openPath` 仅桌面存在），与主页行为一致。
+
+**验证：** `packages/app` typecheck EXIT=0；helpers/server/shared-projects 60 pass。整仓单测 778 pass / 1 fail——fail 是 `i18n parity` 的 ar.ts 缺 6 个 key（`provider.custom.*`、`session.rail.running`），已在 `origin/dev` 上核实同样缺失（scripts 对比 en/ar 两文件，dev 与 HEAD 缺失集合相同），属存量问题非本次引入。
+
+**部署：** 桌面 `bunx electron-vite build`（主 bundle `main-BjSogjra.js`）→ 停 7 个 `OpenCode Dev` → `bunx electron-builder --win --dir --config electron-builder.config.ts` → asar 二进制搜到 `project-reveal-menu` → 重启 6 进程。手机 UI 按常规重建（`index-DznuRfkz.js`，含代码但平台门控不显示）。API :3910 与 :3000 均 200。
+
+**说明：** 此改动未提交（工作区仅 `sidebar-project.tsx` 一个文件 M，另有两个 gitignore 的 dist-next 目录 untracked）。
+
+
+## 2026-10-15 — 恢复 app 的 followup 消息排队（两套设置 UI，手机+桌面）
+
+**背景：** 用户反馈"发消息没有排队"。静态分析+git 确认：app 曾有排队（feat #17233），被 `ae7e2eb3fb chore(app): remove queued follow-ups for now`（2026-04-03）移除——`settings.general.followup` 被强制迁移为 `steer`，`queueEnabled` 恒 false，队列坞/排水链路成死代码。服务端 V2 core 的 steer/queue inbox 一直存在（`core/src/session/input.ts` 的 promoteSteers/promoteNextQueued），但 app 的 prompt 走 legacy `SessionPrompt`（`ensureRunning` 只 join，不打断在途回答）。相关可视化在未合入的分支（#53076/#53338 等）。
+
+**改动（packages/app 3 文件）：**
+- `context/settings.tsx`：删强制迁移 effect；getter/setter 还原直读直写；默认值 `followup` 改 `"queue"`（上游原默认是 steer）。
+- `components/settings-general.tsx`：恢复 followup 选项行（Select，`data-action="settings-followup"`）。
+- `components/settings-v2/general.tsx`：GeneralSection 里加 SelectV2 同款行。
+
+**行为：** 忙碌时提交 → 入本地队列（persist，不即发），坞显示"N 条排队消息"（立即发送/编辑）；会话 idle 时排水 effect（session.tsx:1928）自动发队首；点停止（paused）挂起；失败项留坞可重发。空闲时提交照常直发。翻译键 en.ts:997-1000 / zh.ts:980-983 一直存在，未改 i18n。
+
+**验证：** app 与 desktop `bun typecheck` 通过；产物 chunk（dialog-settings-*.js、index-*.js）里搜到 `settings-followup`；桌面 renderer 主包 main-BMlzRCKh.js。
+
+**部署：** 手机 `build-opencode-ui.ps1`（主包 `index-DU2LC-bz.js`；serve 脚本对 html 设 no-cache，手机刷新即生效，无需重启）。桌面 `bunx electron-vite build` → `bunx electron-builder --win --dir --config electron-builder.config.ts`（exe 重写于 22:29:43；当时桌面 App 未在运行，无需停进程）。**未提交**：工作区 M = settings.tsx / settings-general.tsx / settings-v2/general.tsx。
+
+
+## 2026-10-15 — 排队在手机无效：根因是持久化设置覆盖新默认值（已修）
+
+**现象：** 手机端连发 2 条消息，第二条不排队、直接发出。
+
+**根因（静态确认）：** `settings.v3` 是**设备本地**持久化（`persisted("settings.v3", createStore<Settings>(defaultSettings))`，`utils/persist.ts`）。store 从创建时就从当时的 `defaultSettings` 拿到 `followup:"steer"`；此后任何一次设置写入（如 newLayoutDesigns 等自动 effect）都会把**整个 blob**（含 followup:"steer"）落盘。加载时 `normalize → merge(defaults, stored)`：标量以**存储值**为准（persist.ts:198 `return value`），所以光把默认值改成 "queue" 对已有设备无效——存储里焊着 "steer"。另：手机若未刷新，连新 bundle 都没加载（需要刷新页面才能拿到新设置行/队列坞）。
+
+**修复（settings.tsx）：** 加一次性迁移 effect——`followupChosen !== true 且存储值为 "steer"` 时翻回 "queue"；`setFollowup` 同时写 `followupChosen: true`，此后 UI 上的显式选择（含选回 steer）永不被迁移覆盖。`Settings` 接口加 `followupChosen?: boolean`。
+
+**验证：** app/desktop typecheck 通过；手机主包重建为 `index-D58UIwn9.js`；桌面 renderer main `main-D4AlZSBa.js` 并重打包 win-unpacked。手机需**刷新页面**后生效；桌面需**重新启动** App。
+
+**备选（未采用）：** bump 存储 key（会重置全部设置）、让用户手动在设置里选「排队」（每个设备都要手动一次）。
+
+
+## 2026-10-15 — PWA 化（档1/2）+ Web Push 完成提醒（档3）
+
+**档1/2（SW + 安装）：** `packages/app/public/sw.js`（新）——导航 network-first→缓存兜底（离线壳）、哈希资源 cache-first、`/api|/event|/session` 等前缀一律不拦截（与 serve 脚本 API_PREFIX 同步）；dev 不注册、`entry.tsx` 只在 `PROD + isSecureContext` 注册；`serve-ui-build.js` 对 `/sw.js` 加 `no-cache`（否则 max-age=86400 卡更新）。manifest/icons/apple-meta 仓库本来就有。**手机要 https 才会注册 SW**（Secure Context 硬门槛）。
+
+**档 B（HTTPS）：** Tailscale Serve 未启用。需管理员点一次：`https://login.tailscale.com/f/serve?node=nYHkPhzUhG11CNTRL`，之后跑 `tailscale serve --bg 3000`（已挂起过一次，启用后重跑即可）。生效后手机改访问 `https://desktop-noecbeh.tailcd9d62.ts.net/`。**注意：origin 改变 → 手机 localStorage 重置一次（settings/队列/布局），服务端会话不受影响。**
+
+**档 C（Web Push，全部在 opencode-web，不侵入 opencode 本体）：**
+- `push-daemon.js`（新）：VAPID 存 `push-keys.json`（web-push 生成）；订阅存 `push-subscriptions.json`；SSE 连 `127.0.0.1:3910/event`，监听 `session.idle` → 8s debounce（合并子会话抖动）→ `GET /session/{id}` 取 parentID 跳过子会话 → `web-push` 发送（404/410 自动剪除）。
+- `serve-ui-build.js`：挂 `/pwa/push/key|subscribe|unsubscribe`（同进程，无新端口）；`npm i web-push`（web-push 依赖目录 package.json 已在 opencode-web 生成）。
+- app 侧：`src/utils/push.ts`（新）——权限请求 + `pushManager` 订阅/退订 + 服务端同步（同 key 幂等，异 key 自动轮换）；`context/notification.tsx` 挂了同步 effect（桌面跳过）；两套设置 UI 的「agent 通知」开关在开启时请求权限。
+- 已验：typecheck 通过；`/pwa/push/key` 返回公钥；subscribe/unsubscribe 204+文件落盘；UI 日志 `push: SSE connected (200)`。手机端最终 E2E（通知到达）待 HTTPS 生效后在手机上验证。
+- 构建：手机 `index-BUuvNfWA.js`；桌面 renderer `main-DX89x21v.js`（exe 已重打包）。
+
+**未提交：** app 侧 M = entry.tsx / notification.tsx / settings-general.tsx / settings-v2/general.tsx + 新文件 sw.js、utils/push.ts（另有此前 followup 的 3 个文件）；opencode-web 侧新文件 push-daemon.js、package.json、push-keys.json（scripts 非仓库）。
+
+**前置条件：** iOS 需 16.4+ 且**已添加到主屏**才允许 Web Push；Android Chrome 需 GMS 推送。推送与「agent 通知」开关绑定（关掉即退订 + 服务端删除）。
+
+### 2026-10-15 深夜 — 推送 E2E 打通的两个关键点
+
+1. **VAPID subject 不能用 `.local`**：`mailto:push@opencode.local` 被 Apple 推送服务以 403 `BadJwtToken` 拒绝；改成 `mailto:push@example.com` 后 201 全过（push-daemon.js 已修，UI 进程已重启）。排查法：用独立 node 脚本逐个 subject 试发。
+2. **iOS 通知授权只能由点击触发**：`settings.notifications.agent` 默认就是 `true`，导致开关"默认开着但从未被点击过"→ 授权弹窗从未出现 → 无订阅。解法：把开关**关掉再打开**（一次点击）即完成授权 + 订阅；服务器日志出现 `push: subscription registered`（端点为 web.push.apple.com）。测试推送已被 Apple 受理（201）且**用户已在 iPhone 上确认收到**。PWA + Web Push 全链路打通。
+3. 重启 UI 进程的稳妥方式：改完 serve-ui-build.js/push-daemon.js 后 `Stop-Process ui.pid` + `Start-Process node serve-ui-build.js`（只重启 UI，不动 3910 API）；注意从 opencode 的 bash 工具里带 `-RedirectStandardOutput` 启动会被工具句柄检查掐掉，命令本身已生效、直接查端口/日志即可。
