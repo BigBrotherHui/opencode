@@ -3,6 +3,7 @@ import { useLanguage } from "@/context/language"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { showToast } from "@/utils/toast"
+import { modelConfigEntry, modelRow } from "./dialog-custom-provider-form"
 import type { DiscoverModelsError } from "@opencode-ai/sdk/v2"
 
 const OPENAI_COMPATIBLE = "@ai-sdk/openai-compatible"
@@ -106,7 +107,7 @@ export function useModelDiscovery() {
   const addModels = async (providerID: string, ids: readonly string[]) => {
     const existing = providerConfig(providerID)
     const models = { ...(existing?.models ?? {}) }
-    for (const id of ids) if (!models[id]) models[id] = { name: id }
+    for (const id of ids) if (!models[id]) models[id] = modelConfigEntry(modelRow(), id)
     await serverSync().updateConfig({
       ...config(),
       provider: { ...config().provider, [providerID]: { ...existing, models } },

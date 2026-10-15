@@ -63,22 +63,34 @@ describe("validateCustomProvider", () => {
           },
         },
         models: {
-          "model-a": { name: "Model A" },
+          "model-a": {
+            name: "Model A",
+            reasoning: true,
+            attachment: true,
+            modalities: { input: ["image", "text"] },
+            variants: {
+              low: { reasoningEffort: "low" },
+              medium: { reasoningEffort: "medium" },
+              high: { reasoningEffort: "high" },
+              xhigh: { reasoningEffort: "xhigh" },
+              max: { reasoningEffort: "max" },
+            },
+          },
         },
       },
     })
   })
 
-  test("omits capability fields that match runtime defaults", () => {
+  test("omits capability fields the user turned off", () => {
     const result = validateCustomProvider({
       form: {
         providerID: "custom-provider",
         name: "Provider",
         baseURL: "https://api.example.com",
         apiKey: "",
-        // Reasoning/attachment/temperature default to false, tool calling to true,
-        // and input modalities to text-only for a custom provider.
-        models: [row()],
+        // Reasoning/attachment off and text-only input omit every capability
+        // field; tool calling defaults to on so it is omitted too.
+        models: [row({ reasoning: false, attachment: false, inputModalities: [] })],
         headers: [{ row: "h0", key: "", value: "", err: {} }],
         err: {},
       },
@@ -127,6 +139,13 @@ describe("validateCustomProvider", () => {
         tool_call: false,
         modalities: { input: ["image", "pdf", "text"] },
         limit: { context: 128_000, output: 32_000 },
+        variants: {
+          low: { reasoningEffort: "low" },
+          medium: { reasoningEffort: "medium" },
+          high: { reasoningEffort: "high" },
+          xhigh: { reasoningEffort: "xhigh" },
+          max: { reasoningEffort: "max" },
+        },
       },
     })
   })

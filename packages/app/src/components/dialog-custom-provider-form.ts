@@ -107,6 +107,21 @@ export function modelConfigEntry(row: ModelRow, name: string) {
     entry.limit = { context, output }
   }
 
+  // Write every effort tier explicitly instead of relying on the runtime
+  // defaults: @ai-sdk/openai-compatible only synthesizes low/medium/high, and
+  // some families (glm, deepseek-v3, kimi, qwen, ...) synthesize nothing, so
+  // xhigh/max would otherwise never appear. Upstreams that reject a tier
+  // handle the downgrade themselves.
+  if (row.reasoning) {
+    entry.variants = {
+      low: { reasoningEffort: "low" },
+      medium: { reasoningEffort: "medium" },
+      high: { reasoningEffort: "high" },
+      xhigh: { reasoningEffort: "xhigh" },
+      max: { reasoningEffort: "max" },
+    }
+  }
+
   return entry
 }
 
@@ -320,11 +335,11 @@ export const modelRow = (): ModelRow => ({
   row: nextRow(),
   id: "",
   name: "",
-  reasoning: false,
-  attachment: false,
+  reasoning: true,
+  attachment: true,
   temperature: false,
   toolCall: true,
-  inputModalities: [],
+  inputModalities: ["image"],
   contextLimit: "",
   outputLimit: "",
   expanded: false,
