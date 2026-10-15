@@ -44,14 +44,14 @@ async function readPending() {
 // on the device (iOS silently no-ops parts of the notification-click path).
 function debugBeacon(data) {
   try {
-    void fetch("/pwa/push/debug", {
+    return fetch("/pwa/push/debug", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ version: "click-trace-1", ...data }),
       keepalive: true,
-    })
+    }).catch(() => undefined)
   } catch {
-    undefined
+    return Promise.resolve()
   }
 }
 
@@ -140,6 +140,7 @@ self.addEventListener("push", (event) => {
   const url = data.url || "/"
   event.waitUntil(
     Promise.all([
+      debugBeacon({ stage: "sw-push", url, tag: data.tag }),
       writePending({ url, ts: Date.now(), clicked: false }),
       self.registration.showNotification(data.title || "OpenCode", {
         body: data.body || "",
@@ -157,6 +158,7 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     (async () => {
       const direct = event.notification.data && event.notification.data.url
+      event.waitUntil(debugBeacon({ stage: "sw-click-entry", url: direct, tag: event.notification.tag }))
       const pending = direct ? undefined : await readPending()
       const url = direct || (pending && pending.url) || "/"
       // Mark the click so a cold-started app can deep-link itself even when
@@ -171,8 +173,11 @@ self.addEventListener("notificationclick", (event) => {
       } catch {
         undefined
       }
-      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true })
-      debugBeacon({ stage: "sw-click", url, direct: !!direct, clients: clients.length })
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true }).catch(async (error) => {
+        event.waitUntil(debugBeacon({ stage: "sw-clients-error", message: String(error) }))
+        return []
+      })
+      event.waitUntil(debugBeacon({ stage: "sw-click", url, direct: !!direct, clients: clients.length }))
       for (const client of clients) {
         if ("focus" in client) {
           client.postMessage({ type: "opencode:notification-click", url })
