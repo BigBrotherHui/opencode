@@ -11,6 +11,10 @@ type ServerProjectState = {
   projects: Record<string, StoredProject[]>
   lastProject: Record<string, string>
   recentlyClosed: Record<string, string[]>
+  // Scopes whose local project list was merged into the shared server list once.
+  // Later reads trust the server instead, so a project closed on one device is not
+  // resurrected by a stale copy on another.
+  sharedProjectsSynced: Record<string, boolean>
 }
 const HEALTH_POLL_INTERVAL_MS = 10_000
 // The store retains more history than is displayed. Consumers filter recently closed entries
@@ -80,16 +84,26 @@ export function createServerProjects<T extends ServerProjectState>(input: {
   scope: Accessor<ServerScope>
   store: Store<T>
   setStore: SetStoreFunction<T>
+  // Push callbacks are shared per server scope rather than per instance. The active
+  // list, a per-server list and the home view are separate handles over the same
+  // store bucket, so a mutation made through any of them must publish. Keying by
+  // scope lets the active instance find the callback a server's sync layer registered
+  // through its own per-server instance.
+  syncs?: Map<ServerScope, (scope: ServerScope, projects: StoredProject[]) => void>
 }) {
   const setStore = input.setStore as unknown as SetStoreFunction<ServerProjectState>
   const current = () => input.store.projects[input.scope()] ?? []
   const currentClosed = () => input.store.recentlyClosed?.[input.scope()] ?? []
+  // Set once a server that supports shared app state is attached. Until then the
+  // store behaves exactly as before: local-only, no network, no behavior change.
+  const push = () => input.syncs?.get(input.scope())?.(input.scope(), current())
   const remove = (directory: string) => {
     setStore(
       "projects",
       input.scope(),
       current().filter((project) => project.worktree !== directory),
     )
+    push()
   }
   return {
     list: current,
@@ -108,6 +122,7 @@ export function createServerProjects<T extends ServerProjectState>(input: {
       }
       if (current().some((project) => project.worktree === directory)) return
       setStore("projects", scope, [{ worktree: directory, expanded: true }, ...current()])
+      push()
     },
     // User-initiated close: removes the project and records it in recently closed.
     // Internal, non-user removals (e.g. sandbox/worktree normalization) should use remove().
@@ -123,10 +138,12 @@ export function createServerProjects<T extends ServerProjectState>(input: {
     expand(directory: string) {
       const index = current().findIndex((project) => project.worktree === directory)
       if (index !== -1) setStore("projects", input.scope(), index, "expanded", true)
+      push()
     },
     collapse(directory: string) {
       const index = current().findIndex((project) => project.worktree === directory)
       if (index !== -1) setStore("projects", input.scope(), index, "expanded", false)
+      push()
     },
     move(directory: string, toIndex: number) {
       const fromIndex = current().findIndex((project) => project.worktree === directory)
@@ -135,6 +152,7 @@ export function createServerProjects<T extends ServerProjectState>(input: {
       const [item] = next.splice(fromIndex, 1)
       next.splice(toIndex, 0, item)
       setStore("projects", input.scope(), next)
+      push()
     },
     last() {
       return input.store.lastProject[input.scope()]
@@ -142,6 +160,22 @@ export function createServerProjects<T extends ServerProjectState>(input: {
     touch(directory: string) {
       setStore("lastProject", input.scope(), directory)
     },
+    // Replaces the list with what another client wrote. Adds projects rather than
+    // replacing wholesale so a project opened locally in the meantime is not lost.
+    adopt(projects: StoredProject[]) {
+      setStore("projects", input.scope(), projects)
+    },
+    // One-time merge guard, documented on ServerProjectState.sharedProjectsSynced.
+    synced() {
+      return input.store.sharedProjectsSynced[input.scope()] === true
+    },
+    markSynced() {
+      setStore("sharedProjectsSynced", input.scope(), true)
+    },
+    attach(handler: { push: (scope: ServerScope, projects: StoredProject[]) => void }) {
+      input.syncs?.set(input.scope(), handler.push)
+    },
+    serialize: current,
   }
 }
 
@@ -270,6 +304,7 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
         projects: {} as Record<string, StoredProject[]>,
         lastProject: {} as Record<string, string>,
         recentlyClosed: {} as Record<string, string[]>,
+        sharedProjectsSynced: {} as Record<string, boolean>,
       }),
     )
 
@@ -318,12 +353,13 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
     )
 
     const scope = (key = state.active) => ServerScope.fromServerKey(key, props.canonicalLocalServer)
-    const projects = createServerProjects({ scope, store, setStore })
+    const projectSyncs = new Map<ServerScope, (scope: ServerScope, projects: StoredProject[]) => void>()
+    const projects = createServerProjects({ scope, store, setStore, syncs: projectSyncs })
     const projectStores = new Map<ServerConnection.Key, ReturnType<typeof createServerProjects>>()
     const projectsForServer = (key: ServerConnection.Key) => {
       const existing = projectStores.get(key)
       if (existing) return existing
-      const next = createServerProjects({ scope: () => scope(key), store, setStore })
+      const next = createServerProjects({ scope: () => scope(key), store, setStore, syncs: projectSyncs })
       projectStores.set(key, next)
       return next
     }
@@ -354,6 +390,14 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
       projects: {
         ...projects,
         forServer: projectsForServer,
+        // Connects the active server's sync layer so local project changes are
+        // published. Servers without shared state simply never attach.
+        attach(push: (scope: ServerScope, projects: StoredProject[]) => void) {
+          projects.attach({ push })
+        },
+        attachForServer(key: ServerConnection.Key, push: (scope: ServerScope, projects: StoredProject[]) => void) {
+          projectsForServer(key).attach({ push })
+        },
       },
     }
   },

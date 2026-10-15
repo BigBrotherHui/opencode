@@ -4,7 +4,7 @@ import { createSimpleContext } from "@opencode-ai/ui/context"
 import { createGlobalEmitter } from "@solid-primitives/event-bus"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { type Accessor, batch, createMemo, createResource, onCleanup, onMount } from "solid-js"
-import { createApiForServer, createSdkForServer, type ServerApi } from "@/utils/server"
+import { authTokenFromCredentials, createApiForServer, createSdkForServer, type ServerApi } from "@/utils/server"
 import { useLanguage } from "./language"
 import { usePlatform } from "./platform"
 import { ServerConnection, useServer } from "./server"
@@ -182,6 +182,10 @@ type ServerSDKBase = {
   createClient: (
     opts: Omit<Parameters<typeof createSdkForServer>[0], "server" | "fetch">,
   ) => ReturnType<typeof createSdkForServer>
+  appState: {
+    read: (scope: string) => Promise<unknown>
+    write: (scope: string, value: unknown) => Promise<void>
+  }
 }
 
 function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerScope): ServerSDKBase {
@@ -339,6 +343,37 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     throwOnError: true,
   })
   const currentApi: ServerApi = createApiForServer({ server: server.http, fetch: platform.fetch })
+  // Shared app state lives on the server-global routes, which every supported
+  // protocol version serves. Called directly because the generated clients only
+  // cover instance routes.
+  const appStateFetch = platform.fetch ?? globalThis.fetch
+  const appStateHeaders = (): Record<string, string> => {
+    if (!server.http.password) return {}
+    return {
+      authorization: `Basic ${authTokenFromCredentials({
+        username: server.http.username,
+        password: server.http.password,
+      })}`,
+    }
+  }
+  const appState = {
+    read: async (scope: string) => {
+      const response = await appStateFetch(new URL(`/global/app-state/${encodeURIComponent(scope)}`, server.http.url), {
+        headers: appStateHeaders(),
+      })
+      if (!response.ok) throw new Error(`app state read failed: ${response.status}`)
+      if (!(response.headers.get("content-type") ?? "").includes("json")) throw new Error("app state unsupported")
+      return response.json()
+    },
+    write: async (scope: string, value: unknown) => {
+      const response = await appStateFetch(new URL(`/global/app-state/${encodeURIComponent(scope)}`, server.http.url), {
+        method: "PUT",
+        headers: { ...appStateHeaders(), "content-type": "application/json" },
+        body: JSON.stringify(value),
+      })
+      if (!response.ok) throw new Error(`app state write failed: ${response.status}`)
+    },
+  }
   const legacy = (directory?: string) =>
     createSdkForServer({
       server: server.http,
@@ -369,6 +404,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
         ...opts,
       })
     },
+    appState,
   }
 }
 

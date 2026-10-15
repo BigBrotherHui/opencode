@@ -99,7 +99,7 @@ describe("createServerProjects", () => {
   test("keeps active and explicit server buckets in one reactive store", () => {
     createRoot((dispose) => {
       const [scope] = createSignal(ServerScope.local)
-      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {}, sharedProjectsSynced: {} })
       const active = createServerProjects({ scope, store, setStore })
       const remote = createServerProjects({ scope: () => "https://debian.example" as ServerScope, store, setStore })
 
@@ -116,10 +116,51 @@ describe("createServerProjects", () => {
     })
   })
 
+  // The active list and a server's per-server list are separate handles over the same
+  // store bucket, so a mutation through the active handle must still publish through
+  // the callback the server's sync layer registered on its own instance. Without the
+  // shared map, opening a project from the sidebar never reaches the server.
+  test("publishes from the active handle through the per-server callback", () => {
+    createRoot((dispose) => {
+      const syncs = new Map()
+      const [scope] = createSignal(ServerScope.local)
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {}, sharedProjectsSynced: {} })
+      const active = createServerProjects({ scope, store, setStore, syncs })
+      const perServer = createServerProjects({ scope: () => ServerScope.local, store, setStore, syncs })
+
+      const pushed: Array<Array<{ worktree: string; expanded: boolean }>> = []
+      perServer.attach({ push: (_scope, projects) => pushed.push(projects) })
+
+      active.open("/repo")
+      expect(pushed.at(-1)).toEqual([{ worktree: "/repo", expanded: true }])
+
+      active.close("/repo")
+      expect(pushed.at(-1)).toEqual([])
+      dispose()
+    })
+  })
+
+  // The merged-once flag decides whether a later read may still merge the local list
+  // into the shared one, so it has to survive for the lifetime of the stored scope.
+  test("records that a scope finished its first shared merge", () => {
+    createRoot((dispose) => {
+      const [scope] = createSignal(ServerScope.local)
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {}, sharedProjectsSynced: {} })
+      const projects = createServerProjects({ scope, store, setStore })
+      const other = createServerProjects({ scope: () => "https://debian.example" as ServerScope, store, setStore })
+
+      expect(projects.synced()).toBe(false)
+      projects.markSynced()
+      expect(projects.synced()).toBe(true)
+      expect(other.synced()).toBe(false)
+      dispose()
+    })
+  })
+
   test("tracks recently closed projects and drops them when reopened", () => {
     createRoot((dispose) => {
       const [scope] = createSignal(ServerScope.local)
-      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {}, sharedProjectsSynced: {} })
       const projects = createServerProjects({ scope, store, setStore })
 
       projects.open("/a")
@@ -140,7 +181,7 @@ describe("createServerProjects", () => {
   test("remove drops a project without recording it as recently closed", () => {
     createRoot((dispose) => {
       const [scope] = createSignal(ServerScope.local)
-      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {}, sharedProjectsSynced: {} })
       const projects = createServerProjects({ scope, store, setStore })
 
       projects.open("/repo/subdir")
@@ -154,7 +195,7 @@ describe("createServerProjects", () => {
   test("retains recently closed history beyond the visible display limit", () => {
     createRoot((dispose) => {
       const [scope] = createSignal(ServerScope.local)
-      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {}, sharedProjectsSynced: {} })
       const projects = createServerProjects({ scope, store, setStore })
 
       // Closing 6 projects keeps all 6 in the store even though only 5 are displayed;
@@ -171,7 +212,7 @@ describe("createServerProjects", () => {
   test("caps recently closed history at the store limit", () => {
     createRoot((dispose) => {
       const [scope] = createSignal(ServerScope.local)
-      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {}, sharedProjectsSynced: {} })
       const projects = createServerProjects({ scope, store, setStore })
 
       for (let i = 1; i <= 20; i++) {
@@ -188,7 +229,7 @@ describe("createServerProjects", () => {
   test("dedupes recently closed entries by normalized path", () => {
     createRoot((dispose) => {
       const [scope] = createSignal(ServerScope.local)
-      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {}, sharedProjectsSynced: {} })
       const projects = createServerProjects({ scope, store, setStore })
 
       projects.close("/repo")

@@ -273,14 +273,14 @@ const WorkspaceSessionList = (props: {
   loadMore: () => Promise<void>
   language: ReturnType<typeof useLanguage>
 }): JSX.Element => {
-  const [pins, setPins] = persisted(Persist.window("session-rail.pins"), createStore<Record<string, boolean>>({}))
+  const serverSync = useServerSync()
   const [orderStore, setOrder] = persisted(
     Persist.window("session-rail.order"),
     createStore<{ ids: string[] }>({ ids: [] }),
   )
 
   const rank = createMemo(() => new Map(orderStore.ids.map((id, index) => [id, index])))
-  const isPinned = (id: string) => pins[id] === true
+  const isPinned = (id: string) => serverSync().sessionPins.isPinned(id)
 
   /** Manual order wins; anything not ordered yet falls back to newest first. */
   const arrange = (list: Session[]) =>
@@ -320,7 +320,7 @@ const WorkspaceSessionList = (props: {
     prefetchSession: props.ctx.prefetchSession,
     archiveSession: props.ctx.archiveSession,
     pinned: isPinned(session.id),
-    onTogglePin: () => setPins(session.id, !isPinned(session.id)),
+    onTogglePin: () => serverSync().sessionPins.toggle(session.id),
   })
 
   return (

@@ -8,7 +8,7 @@ import type {
 } from "@opencode-ai/sdk/v2/client"
 import { showToast } from "@/utils/toast"
 import { getFilename } from "@opencode-ai/core/util/path"
-import { type Accessor, batch, createMemo, getOwner, onCleanup, onMount, untrack } from "solid-js"
+import { type Accessor, batch, createEffect, createMemo, getOwner, onCleanup, onMount, untrack } from "solid-js"
 import { createStore, produce, reconcile } from "solid-js/store"
 import { useLanguage } from "@/context/language"
 import type { InitError } from "../pages/error"
@@ -46,7 +46,10 @@ import { ServerConnection, useServer } from "./server"
 import { retry } from "@opencode-ai/core/util/retry"
 import type { ServerScope } from "@/utils/server-scope"
 import { createHomeSessionIndexCache } from "./global-sync/home-session-index"
-import { persisted } from "@/utils/persist"
+import { createSharedProjects, mergeProjects, sameProjects, SHARED_PROJECTS_SCOPE } from "./global-sync/shared-projects"
+import { createDebouncedPush } from "./global-sync/shared-projects-push"
+import { createSharedPins, mergePins, samePins, SHARED_PINS_SCOPE } from "./global-sync/shared-pins"
+import { Persist, persisted } from "@/utils/persist"
 import type { ServerApi } from "@/utils/server"
 import type {
   McpListInput,
@@ -202,8 +205,14 @@ function makeQueryOptionsApi(
 }
 export type QueryOptionsApi = ReturnType<typeof makeQueryOptionsApi>
 
+// How often a visible client re-reads the shared project list. Only cross-process
+// setups (desktop app and web UI talking to different servers over one database)
+// depend on it; on a single server the event stream is immediate.
+const SHARED_PROJECTS_REFRESH_MS = 10_000
+
 export function createServerSyncContextInner(serverSDK: ServerSDK) {
   const language = useLanguage()
+  const server = useServer()
   const owner = getOwner()
   if (!owner) throw new Error("ServerSync must be created within owner")
 
@@ -546,6 +555,14 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     if (directory === "global") {
       if (eventType === "server.connected" && activeSessionsQuery.data === undefined && !activeSessionsQuery.isFetching)
         void activeSessionsQuery.refetch()
+      // Another client changed shared state; re-read so this client follows.
+      if (eventType === "app-state.updated") {
+        const properties: unknown = event.properties
+        const scope =
+          properties && typeof properties === "object" && "scope" in properties ? properties.scope : undefined
+        if (scope === SHARED_PINS_SCOPE) void reconcilePins()
+        if (scope === SHARED_PROJECTS_SCOPE) void reconcileProjects()
+      }
       applyGlobalEvent({
         event,
         project: globalStore.project,
@@ -670,6 +687,112 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     },
   }))
 
+  // The project list is shared through the server so every client sees the same
+  // projects. The list itself stays in the local persisted store; this only keeps
+  // that store and the server in step.
+  const sharedProjects = createSharedProjects({
+    transport: serverSDK.appState,
+    onError: (error) => console.warn("[shared-projects] sync failed", error),
+  })
+  const projectPush = createDebouncedPush(sharedProjects)
+  // Publish every local change for the server this sync context belongs to. Servers
+  // without shared state never became available, so push is a no-op there.
+  server.projects.attachForServer(ServerConnection.key(serverSDK.server), (_scope, projects) => projectPush(projects))
+  // Reads the shared list and makes the local store match it. A server with nothing
+  // stored yet gets this device's projects instead, so the first device to connect
+  // seeds the list rather than every other device starting empty.
+  const reconcileProjects = async () => {
+    const result = await sharedProjects.load()
+    if (!result) return false
+    const projects = server.projects.forServer(ServerConnection.key(serverSDK.server))
+    if (result.unseeded) {
+      sharedProjects.seed(projects.list())
+      projects.markSynced()
+      return true
+    }
+    // The first read on a device merges its local list in, so projects opened before
+    // the server had any are not lost. Every read after that trusts the server, which
+    // is what lets a project closed on another device stay closed.
+    const first = !projects.synced()
+    const next = first ? mergeProjects(result.remote, projects.list()) : result.remote
+    if (!sameProjects(next, projects.list())) projects.adopt(next)
+    if (first && next.length !== result.remote.length) sharedProjects.seed(next)
+    projects.markSynced()
+    return true
+  }
+  // Pinned sessions are shared the same way as projects: the local store keeps a
+  // record for O(1) lookup, and the server holds the authoritative list of IDs so a
+  // phone and a desktop agree on what is pinned. The local key keeps the name the
+  // sidebar used before syncing existed, so pins made before this change survive and
+  // are merged into the server on the first reconcile.
+  const [pinsStore, setPinsStore, , pinsReady] = persisted(
+    Persist.window("session-rail.pins"),
+    createStore<Record<string, boolean>>({}),
+  )
+  const localPins = () => Object.keys(pinsStore).filter((id) => pinsStore[id])
+  const sharedPins = createSharedPins({
+    transport: serverSDK.appState,
+    onError: (error) => console.warn("[shared-pins] sync failed", error),
+  })
+  let pinsSynced = false
+  const adoptPins = (ids: string[]) => {
+    const next: Record<string, boolean> = {}
+    for (const id of ids) next[id] = true
+    setPinsStore(reconcile(next))
+  }
+  const setPinned = (id: string, value: boolean) => {
+    if (value === (pinsStore[id] === true)) return
+    setPinsStore(produce((draft) => {
+      if (value) draft[id] = true
+      else delete draft[id]
+    }))
+    sharedPins.push(localPins())
+  }
+  const reconcilePins = async () => {
+    if (!pinsReady()) return false
+    const result = await sharedPins.load()
+    if (!result) return false
+    if (result.unseeded) {
+      sharedPins.seed(localPins())
+      return true
+    }
+    // First read on a device merges its local pins in, so pins made before the server
+    // had any are not lost. Every read after that trusts the server, which is what
+    // lets an unpin on another device stay unpinned.
+    const first = !pinsSynced
+    const next = first ? mergePins(result.remote, localPins()) : result.remote
+    if (!samePins(next, localPins())) adoptPins(next)
+    if (first && next.length !== result.remote.length) sharedPins.seed(next)
+    pinsSynced = true
+    return true
+  }
+
+  // The desktop app runs its own server process against the same database, so a write
+  // made there never reaches this server's event stream. Re-reading on focus and on a
+  // slow interval is what keeps a phone and a desktop agreeing on their own.
+  onMount(() => {
+    void reconcileProjects()
+    const refresh = () => {
+      if (document.visibilityState === "hidden") return
+      void reconcileProjects()
+      void reconcilePins()
+    }
+    document.addEventListener("visibilitychange", refresh)
+    window.addEventListener("focus", refresh)
+    const timer = setInterval(refresh, SHARED_PROJECTS_REFRESH_MS)
+    onCleanup(() => {
+      document.removeEventListener("visibilitychange", refresh)
+      window.removeEventListener("focus", refresh)
+      clearInterval(timer)
+    })
+  })
+  // Pins hydrate asynchronously on desktop, so the first reconcile waits for the
+  // stored value instead of racing it. On a phone (sync storage) this fires at once.
+  createEffect(() => {
+    if (!pinsReady()) return
+    void reconcilePins()
+  })
+
   return {
     data: globalStore,
     set,
@@ -687,8 +810,30 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     // bootstrap,
     updateConfig: updateConfigMutation.mutateAsync,
     project: projectApi,
+    sharedProjects: {
+      // Loads the shared list and adopts it when the server supports sharing.
+      // Resolves to false so the caller keeps its local behavior on older servers.
+      async ready() {
+        return await reconcileProjects()
+      },
+      // Called after any local change so the server (and every other client) follows.
+      push(projects: { worktree: string; expanded: boolean }[]) {
+        projectPush(projects)
+      },
+      async adopt() {
+        const projects = await sharedProjects.adopt()
+        if (!projects) return
+        const target = server.projects.forServer(ServerConnection.key(serverSDK.server))
+        if (!sameProjects(projects, target.list())) target.adopt(projects)
+      },
+    },
     session,
     homeSessions,
+    sessionPins: {
+      // Reactive read: the sidebar re-renders when a pin is added or removed.
+      isPinned: (id: string) => pinsStore[id] === true,
+      toggle: (id: string) => setPinned(id, pinsStore[id] !== true),
+    },
     mcp: {
       toggle: async (directory: string, name: string) => {
         const key = directoryKey(directory)
