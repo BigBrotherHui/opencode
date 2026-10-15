@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { adaptServerEvent, coalesceServerEvents, enqueueServerEvent, resumeStreamAfterPageShow } from "./server-sdk"
+import { adaptServerEvent, coalesceServerEvents, enqueueServerEvent, resumeStreamAfterPageShow, shouldResumeStreamAfterVisibility } from "./server-sdk"
 import type { OpenCodeEvent } from "@opencode-ai/client/promise"
 import type { Event } from "@opencode-ai/sdk/v2/client"
 
@@ -12,6 +12,14 @@ describe("resumeStreamAfterPageShow", () => {
     resumeStreamAfterPageShow({ persisted: true } as PageTransitionEvent, start)
 
     expect(starts).toBe(1)
+  })
+})
+
+describe("shouldResumeStreamAfterVisibility", () => {
+  test("restarts only on the hidden -> visible transition", () => {
+    expect(shouldResumeStreamAfterVisibility({ state: "visible", wasHidden: true })).toBe(true)
+    expect(shouldResumeStreamAfterVisibility({ state: "visible", wasHidden: false })).toBe(false)
+    expect(shouldResumeStreamAfterVisibility({ state: "hidden", wasHidden: true })).toBe(false)
   })
 })
 

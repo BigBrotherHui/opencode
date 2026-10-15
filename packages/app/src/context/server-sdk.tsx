@@ -164,6 +164,14 @@ export function resumeStreamAfterPageShow(event: PageTransitionEvent, start: () 
   start()
 }
 
+// A phone that backgrounds a tab usually fires visibilitychange without a bfcache
+// pageshow, and the socket can die silently while the page is frozen. Restarting on
+// the hidden -> visible transition is what revives live events; the transition (not
+// a heartbeat timeout) is the trigger so short and long backgrounding both recover.
+export function shouldResumeStreamAfterVisibility(input: { state: DocumentVisibilityState; wasHidden: boolean }) {
+  return input.state === "visible" && input.wasHidden
+}
+
 type ServerEventEmitter = ReturnType<typeof createGlobalEmitter<{ [key: string]: ServerEvent }>>
 type ServerSDKBase = {
   server: ServerConnection.Any
@@ -260,6 +268,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
   let run: Promise<void> | undefined
   let started = false
   let generation = 0
+  let hidden = false
 
   const start = () => {
     if (started) return run
@@ -327,8 +336,22 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
   }
 
   onMount(() => {
-    makeEventListener(window, "pagehide", stop)
+    makeEventListener(window, "pagehide", () => {
+      hidden = true
+      stop()
+    })
     makeEventListener(window, "pageshow", (event) => resumeStreamAfterPageShow(event, start))
+    makeEventListener(document, "visibilitychange", () => {
+      const state = document.visibilityState
+      if (state === "hidden") {
+        hidden = true
+        return
+      }
+      if (!shouldResumeStreamAfterVisibility({ state, wasHidden: hidden })) return
+      hidden = false
+      stop()
+      void start()
+    })
   })
 
   onCleanup(() => {

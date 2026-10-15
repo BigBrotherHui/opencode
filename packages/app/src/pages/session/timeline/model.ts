@@ -1,5 +1,6 @@
 import type { Message, UserMessage } from "@opencode-ai/sdk/v2"
-import { createMemo, createResource, onCleanup, untrack, type Accessor } from "solid-js"
+import { createMemo, createResource, onCleanup, onMount, untrack, type Accessor } from "solid-js"
+import { makeEventListener } from "@solid-primitives/event-listener"
 import { useServerSync } from "@/context/server-sync"
 import { useSync } from "@/context/sync"
 import { same } from "@/utils/same"
@@ -75,6 +76,27 @@ export function createTimelineModel(input: {
   }
 
   onCleanup(clearRefresh)
+
+  // While the tab was backgrounded the event stream may have been frozen, so the
+  // visible session can be missing messages. Force one sync on the hidden -> visible
+  // transition to catch up without waiting for the user to switch sessions.
+  let hidden = false
+  onMount(() => {
+    makeEventListener(window, "pagehide", () => {
+      hidden = true
+    })
+    makeEventListener(document, "visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        hidden = true
+        return
+      }
+      if (!hidden) return
+      hidden = false
+      const id = input.sessionID()
+      if (!id) return
+      untrack(() => void sync().session.sync(id, { force: true }))
+    })
+  })
 
   return {
     history: { loadOlder, loading, more },
