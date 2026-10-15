@@ -23,7 +23,7 @@ export type ProjectSidebarContext = {
   onProjectMouseLeave: (worktree: string) => void
   onProjectFocus: (worktree: string) => void
   onHoverOpenChanged: (worktree: string, hovered: boolean) => void
-  navigateToProject: (directory: string) => void
+  navigateToProject: (directory: string, options?: { keepMobileSidebar?: boolean }) => void
   openSidebar: () => void
   closeProject: (directory: string) => void
   showEditProjectDialog: (project: LocalProject) => void
@@ -63,7 +63,7 @@ const ProjectTile = (props: {
   onProjectMouseEnter: (worktree: string, event: MouseEvent) => void
   onProjectMouseLeave: (worktree: string) => void
   onProjectFocus: (worktree: string) => void
-  navigateToProject: (directory: string) => void
+  navigateToProject: (directory: string, options?: { keepMobileSidebar?: boolean }) => void
   showEditProjectDialog: (project: LocalProject) => void
   toggleProjectWorkspaces: (project: LocalProject) => void
   workspacesEnabled: (project: LocalProject) => boolean
@@ -137,10 +137,13 @@ const ProjectTile = (props: {
         onClick={() => {
           props.setOpen(false)
           if (props.selected()) {
-            layout.sidebar.toggle()
+            // The mobile drawer is the visible sidebar there, so the same tap closes
+            // the drawer instead of toggling the desktop panel that is not on screen.
+            if (props.mobile) layout.mobileSidebar.hide()
+            else layout.sidebar.toggle()
             return
           }
-          props.navigateToProject(props.project.worktree)
+          props.navigateToProject(props.project.worktree, { keepMobileSidebar: !!props.mobile })
         }}
         onBlur={() => props.setOpen(false)}
       >

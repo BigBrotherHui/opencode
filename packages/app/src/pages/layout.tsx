@@ -338,6 +338,14 @@ export default function LegacyLayout(props: ParentProps) {
     layout.mobileSidebar.hide()
   }
 
+  // Switching projects from the mobile drawer keeps the drawer open, so the project
+  // panel it holds switches along with the route instead of sliding away. Picking a
+  // session still closes it, because that is a choice of content rather than of list.
+  const navigateKeepingMobileSidebar = (href: string) => {
+    clearSidebarHoverState()
+    navigate(href)
+  }
+
   function cycleTheme(direction = 1) {
     const ids = availableThemeEntries().map(([id]) => id)
     if (ids.length === 0) return
@@ -644,7 +652,11 @@ export default function LegacyLayout(props: ParentProps) {
     running: number
   }
 
-  const prefetchChunk = 200
+  // Prefetching exists so switching to a nearby session shows its first screen
+  // immediately. That screen is `initialMessagePageSize` messages, so fetching more
+  // here only pays for history the session view would load on demand anyway. The old
+  // value matched a long session's entire history and cost megabytes per session.
+  const prefetchChunk = 20
   const prefetchConcurrency = 2
   const prefetchPendingLimit = 10
   const span = 4
@@ -1186,8 +1198,9 @@ export default function LegacyLayout(props: ParentProps) {
     return root
   }
 
-  async function navigateToProject(directory: string | undefined) {
+  async function navigateToProject(directory: string | undefined, options?: { keepMobileSidebar?: boolean }) {
     if (!directory) return
+    const go = options?.keepMobileSidebar ? navigateKeepingMobileSidebar : navigateWithSidebarReset
     const root = projectRoot(directory)
     server.projects.touch(root)
     const project = layout.projects.list().find((item) => item.worktree === root)
@@ -1215,7 +1228,7 @@ export default function LegacyLayout(props: ParentProps) {
       const sync = serverSync().ensureDirSyncContext(target.directory)
       if (sync.session.get(target.id)) {
         setStore("lastProjectSession", root, { directory: target.directory, id: target.id, at: Date.now() })
-        navigateWithSidebarReset(`/${base64Encode(target.directory)}/session/${target.id}`)
+        go(`/${base64Encode(target.directory)}/session/${target.id}`)
         return true
       }
       const resolved = await sync.session
@@ -1225,7 +1238,7 @@ export default function LegacyLayout(props: ParentProps) {
       if (!resolved?.directory) return false
       if (!canOpen(resolved.directory)) return false
       setStore("lastProjectSession", root, { directory: resolved.directory, id: resolved.id, at: Date.now() })
-      navigateWithSidebarReset(`/${base64Encode(resolved.directory)}/session/${resolved.id}`)
+      go(`/${base64Encode(resolved.directory)}/session/${resolved.id}`)
       return true
     }
 
@@ -1262,7 +1275,7 @@ export default function LegacyLayout(props: ParentProps) {
       return
     }
 
-    navigateWithSidebarReset(`/${base64Encode(root)}/session`)
+    go(`/${base64Encode(root)}/session`)
   }
 
   function navigateToSession(session: Session | undefined) {
