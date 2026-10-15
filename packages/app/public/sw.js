@@ -162,6 +162,15 @@ self.addEventListener("notificationclick", (event) => {
       // Mark the click so a cold-started app can deep-link itself even when
       // iOS ignored the URL above or dropped notification.data entirely.
       await writePending({ url, ts: Date.now(), clicked: true })
+      // BroadcastChannel reaches open pages without relying on matchAll /
+      // postMessage, which iOS handles unreliably from notification clicks.
+      try {
+        const channel = new BroadcastChannel("opencode-push")
+        channel.postMessage({ type: "opencode:notification-click", url })
+        channel.close()
+      } catch {
+        undefined
+      }
       const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true })
       debugBeacon({ stage: "sw-click", url, direct: !!direct, clients: clients.length })
       for (const client of clients) {

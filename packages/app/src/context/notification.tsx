@@ -158,6 +158,26 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
         pushDebug("app-message", data.url)
         navigate(data.url)
       }
+      // The service worker also broadcasts clicks on a channel (iOS often drops
+      // postMessage), and we poll the pending entry while visible as a last
+      // resort when the app stays in the foreground during a click.
+      let channel: BroadcastChannel | undefined
+      try {
+        channel = new BroadcastChannel("opencode-push")
+        channel.onmessage = (event) => {
+          const data = event.data as { type?: string; url?: string } | undefined
+          if (!data || data.type !== "opencode:notification-click" || typeof data.url !== "string") return
+          void clearPendingNotificationClick()
+          pushDebug("app-broadcast", data.url)
+          navigate(data.url)
+        }
+      } catch {
+        channel = undefined
+      }
+      const poll = window.setInterval(() => {
+        if (document.visibilityState !== "visible") return
+        consume()
+      }, 5000)
       // iOS may not let the service worker reach a running window; re-check the
       // pending click whenever the app comes back to the foreground instead.
       const onVisible = () => {
@@ -171,6 +191,8 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
         navigator.serviceWorker.removeEventListener("message", onMessage)
         document.removeEventListener("visibilitychange", onVisible)
         window.removeEventListener("focus", onVisible)
+        channel?.close()
+        window.clearInterval(poll)
       })
     })
 
