@@ -577,8 +577,14 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
         eventType === "catalog.updated" ||
         eventType === "agent.updated" ||
         eventType === "project.directories.updated"
-      )
+      ) {
+        // The provider catalog is cached for a fresh window, so an explicit
+        // invalidation is what makes a config change from another client show up.
+        void queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === serverSDK.scope && query.queryKey[2] === "providers",
+        })
         bootstrap.refetch()
+      }
       if (eventType === "server.connected" || eventType === "global.disposed") {
         if (recent) return
         for (const directory of Object.keys(children.children)) {
@@ -805,6 +811,11 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     child: children.child,
     peek: children.peek,
     disableMcp: children.disableMcp,
+    // Loads a directory's own provider catalog on demand. The catalog is large and
+    // equals the global one unless the project configures providers itself, so it is
+    // fetched when the model picker opens rather than when a project is entered.
+    activateProviders: children.activateProviders,
+    providersActive: children.providersActive,
     queryOptions: queryOptionsApi,
     refreshProviders,
     // bootstrap,

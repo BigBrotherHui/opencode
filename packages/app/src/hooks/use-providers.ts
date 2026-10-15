@@ -1,5 +1,6 @@
 import { useServerSync } from "@/context/server-sync"
 import { decode64 } from "@/utils/base64"
+import { pathKey } from "@/utils/path-key"
 import { useParams } from "@solidjs/router"
 import { Iterable, pipe } from "effect"
 import { createEffect, createMemo, type Accessor } from "solid-js"
@@ -24,14 +25,8 @@ export function useProviders(directory: Accessor<string | undefined>) {
   const providers = () => {
     const value = dir()
     const projectStore = value ? serverSync().child(value)[0] : undefined
-    if (value)
-      return selectProviderCatalog({
-        explicit: true,
-        directory: value,
-        catalog: projectStore && { ready: projectStore.provider_ready, providers: projectStore.provider },
-      })
     return selectProviderCatalog({
-      explicit: false,
+      explicit: !!value,
       directory: value,
       catalog: projectStore && { ready: projectStore.provider_ready, providers: projectStore.provider },
       global: serverSync().data.provider,
@@ -70,5 +65,15 @@ export function useProviders(directory: Accessor<string | undefined>) {
       ]
       return paid
     },
+  }
+}
+
+// Asks for a directory's own provider catalog. The catalog is loaded lazily because it
+// is the largest response the app fetches and equals the global one unless the project
+// configures providers itself; the model pickers are the surfaces that call this.
+export function useActivateProviders() {
+  const serverSync = useServerSync()
+  return (directory: string | undefined) => {
+    if (directory) serverSync().activateProviders(pathKey(directory))
   }
 }

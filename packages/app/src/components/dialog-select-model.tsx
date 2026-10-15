@@ -1,9 +1,9 @@
 import { Popover as Kobalte } from "@kobalte/core/popover"
-import { Component, ComponentProps, createEffect, createMemo, For, JSX, Show } from "solid-js"
+import { Component, ComponentProps, createEffect, createMemo, For, JSX, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocal } from "@/context/local"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { popularProviders } from "@/hooks/use-providers"
+import { popularProviders, useActivateProviders } from "@/hooks/use-providers"
 import { Button } from "@opencode-ai/ui/button"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
@@ -131,6 +131,7 @@ export function ModelSelectorPopover(props: {
   })
   const dialog = useDialog()
   const local = useLocal()
+  const activateProviders = useActivateProviders()
   const directory = () => decode64(local.slug())
 
   const close = (dismiss: Dismiss) => {
@@ -158,6 +159,9 @@ export function ModelSelectorPopover(props: {
       open={store.open}
       onOpenChange={(next) => {
         if (next) setStore("dismiss", null)
+        // The catalog is lazy: this is the first point that needs the directory's own
+        // view rather than the global fallback.
+        if (next) activateProviders(directory())
         setStore("open", next)
       }}
       modal={false}
@@ -301,6 +305,8 @@ function ModelSelectorPopoverV2View(props: {
   onClose: () => void
 }) {
   const language = useLanguage()
+  const local = useLocal()
+  const activateProviders = useActivateProviders()
   const [store, setStore] = createStore({ open: false, search: "", active: "" })
   let searchRef: HTMLInputElement | undefined
   let contentRef: HTMLDivElement | undefined
@@ -320,6 +326,8 @@ function ModelSelectorPopoverV2View(props: {
   const setOpen = (open: boolean) => {
     if (open) {
       dismiss.allowTriggerRestore()
+      // The directory catalog is lazy; opening the picker is what needs it.
+      activateProviders(decode64(local.slug()))
       setStore({ open: true, active: initialActive() })
       setTimeout(() =>
         requestAnimationFrame(() => {
@@ -525,7 +533,14 @@ export const DialogSelectModel: Component<{ provider?: string; model?: ModelStat
   const dialog = useDialog()
   const language = useLanguage()
   const local = useLocal()
+  const activateProviders = useActivateProviders()
   const directory = () => decode64(local.slug())
+
+  // Opening the picker is the point that needs the directory's own catalog; until
+  // then the global fallback is shown.
+  onMount(() => {
+    activateProviders(directory())
+  })
 
   const provider = () => {
     void import("./dialog-connect-provider").then((x) => {

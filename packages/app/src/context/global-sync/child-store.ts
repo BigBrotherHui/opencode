@@ -46,7 +46,9 @@ export function createChildStoreManager(input: {
   const mcpDirectories = new Set<string>()
   const mcpToggles = new Map<string, (enabled: boolean) => void>()
   const activeDirectories = new Set<string>()
+  const providerDirectories = new Set<string>()
   const activationToggles = new Map<string, (enabled: boolean) => void>()
+  const providerToggles = new Map<string, (enabled: boolean) => void>()
 
   const markKey = (key: DirectoryKey) => {
     if (!key) return
@@ -122,6 +124,8 @@ export function createChildStoreManager(input: {
     mcpToggles.delete(key)
     activeDirectories.delete(key)
     activationToggles.delete(key)
+    providerDirectories.delete(key)
+    providerToggles.delete(key)
     const dispose = disposers.get(key)
     if (dispose) {
       dispose()
@@ -187,6 +191,11 @@ export function createChildStoreManager(input: {
           const initialIcon = icon[0].value
           const [mcpEnabled, setMcpEnabled] = createSignal(false)
           const [instanceQueriesEnabled, setInstanceQueriesEnabled] = createSignal(false)
+          // The project catalog is the largest response the app fetches and, for a
+          // project without its own provider config, byte-identical to the global one.
+          // It is therefore only requested once something actually needs the project's
+          // own view (the model picker), instead of on every project activation.
+          const [providersEnabled, setProvidersEnabled] = createSignal(false)
 
           const pathQuery = useQuery(() => ({ ...input.queryOptions.path(key), enabled: instanceQueriesEnabled() }))
           const mcpQuery = useQuery(() => ({ ...input.queryOptions.mcp(key), enabled: mcpEnabled() }))
@@ -194,7 +203,7 @@ export function createChildStoreManager(input: {
           const lspQuery = useQuery(() => ({ ...input.queryOptions.lsp(key), enabled: instanceQueriesEnabled() }))
           const providerQuery = useQuery(() => ({
             ...input.queryOptions.providers(key),
-            enabled: instanceQueriesEnabled(),
+            enabled: instanceQueriesEnabled() && providersEnabled(),
           }))
           const referenceQuery = useQuery(() => ({
             ...input.queryOptions.references(key),
@@ -205,11 +214,16 @@ export function createChildStoreManager(input: {
             project: "",
             projectMeta: initialMeta,
             icon: initialIcon,
+            // Not ready while the project catalog is still lazy, so callers fall back
+            // to the global catalog instead of reading this as "loaded but empty".
             get provider_ready() {
-              return instanceQueriesEnabled() && !providerQuery.isLoading
+              return providersEnabled() && instanceQueriesEnabled() && !providerQuery.isLoading
             },
+            // While the project catalog is disabled the query reports loaded+undefined,
+            // which would otherwise win over the global fallback and hide every model.
             get provider() {
               const EMPTY = { all: new Map(), connected: [], default: {} }
+              if (!providersEnabled()) return input.global.provider
               if (providerQuery.isLoading) return EMPTY
               if (providerQuery.data?.all.size === 0 && input.global.provider.all.size > 0) return input.global.provider
               return providerQuery.data ?? EMPTY
@@ -263,6 +277,7 @@ export function createChildStoreManager(input: {
           disposers.set(key, dispose)
           mcpToggles.set(key, setMcpEnabled)
           activationToggles.set(key, setInstanceQueriesEnabled)
+          providerToggles.set(key, setProvidersEnabled)
 
           const onPersistedInit = (init: Promise<string> | string | null, run: () => void) => {
             if (!(init instanceof Promise)) return
@@ -339,6 +354,19 @@ export function createChildStoreManager(input: {
     activationToggles.get(key)?.(true)
   }
 
+  // Enables the directory's own provider catalog. Separate from activate() because
+  // that response is large and, for a project without provider config, identical to
+  // the global one; only the model picker needs the project-scoped view.
+  function activateProviders(key: DirectoryKey) {
+    if (providerDirectories.has(key)) return
+    providerDirectories.add(key)
+    providerToggles.get(key)?.(true)
+  }
+
+  function providersActive(directory: string) {
+    return providerDirectories.has(directoryKey(directory))
+  }
+
   function disableMcp(directory: string) {
     const key = directoryKey(directory)
     if (!mcpDirectories.delete(key)) return
@@ -386,6 +414,8 @@ export function createChildStoreManager(input: {
     pinned,
     mcp: (directory: string) => mcpDirectories.has(directoryKey(directory)),
     active: (directory: string) => activeDirectories.has(directoryKey(directory)),
+    activateProviders,
+    providersActive,
     disableMcp,
     disposeDirectory,
     runEviction,

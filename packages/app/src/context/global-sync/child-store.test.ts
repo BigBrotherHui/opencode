@@ -5,6 +5,7 @@ import type { NormalizedProviderListResponse } from "@opencode-ai/session-ui/con
 import type { State } from "./types"
 import type { QueryOptionsApi } from "../server-sync"
 import { ServerScope } from "@/utils/server-scope"
+import { pathKey } from "@/utils/path-key"
 
 let createChildStoreManager: typeof import("./child-store").createChildStoreManager
 const querySingles: Array<() => { queryKey?: unknown[]; enabled?: boolean }> = []
@@ -263,9 +264,16 @@ describe("createChildStoreManager", () => {
       manager.child("/project")
       expect(queries[0]?.().enabled).toBe(true)
       expect(queries[3]?.().enabled).toBe(true)
-      expect(queries[4]?.().enabled).toBe(true)
+      // The provider catalog stays lazy: it is large and equals the global one unless
+      // the project configures providers, so entering the directory must not fetch it.
+      expect(queries[4]?.().enabled).toBe(false)
+      expect(store.provider_ready).toBe(false)
       expect(queries[5]?.().enabled).toBe(true)
       expect(bootstraps).toEqual(["/project"])
+
+      // The model picker asks for the directory's own catalog explicitly.
+      manager.activateProviders(pathKey("/project"))
+      expect(queries[4]?.().enabled).toBe(true)
 
       manager.child("/project", { bootstrap: false })
       expect(queries[0]?.().enabled).toBe(true)

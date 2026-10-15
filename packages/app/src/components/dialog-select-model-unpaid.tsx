@@ -5,9 +5,9 @@ import { List, type ListRef } from "@opencode-ai/ui/list"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { Tag } from "@opencode-ai/ui/tag"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
-import { type Component, Show } from "solid-js"
+import { type Component, onMount, Show } from "solid-js"
 import { useLocal } from "@/context/local"
-import { popularProviders, useProviders } from "@/hooks/use-providers"
+import { popularProviders, useActivateProviders, useProviders } from "@/hooks/use-providers"
 import { ModelTooltip } from "./model-tooltip"
 import { useLanguage } from "@/context/language"
 import { decode64 } from "@/utils/base64"
@@ -20,7 +20,12 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
   const dialog = useDialog()
   const directory = () => decode64(local.slug())
   const providers = useProviders(directory)
+  const activateProviders = useActivateProviders()
   const language = useLanguage()
+
+  // This dialog renders as soon as it opens, which is the point that needs the
+  // directory's own catalog rather than the global fallback.
+  onMount(() => activateProviders(directory()))
 
   const openProviders = (provider?: string) => {
     void import("./dialog-connect-provider").then((x) => {

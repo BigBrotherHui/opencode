@@ -10,6 +10,7 @@ import { useLayout } from "@/context/layout"
 import { useLocal, type ModelSelection } from "@/context/local"
 import type { QueryOptionsApi } from "@/context/server-sync"
 import { useServerSDK } from "@/context/server-sdk"
+import { useServerSync } from "@/context/server-sync"
 import { serverName, ServerConnection, useServer } from "@/context/server"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
@@ -31,7 +32,14 @@ export function createPromptInputController(input: {
   const view = layout.view(input.sessionKey)
   const agentsQuery = createQuery(() => input.queryOptions.agents(pathKey(sdk().directory)))
   const globalProvidersQuery = createQuery(() => input.queryOptions.providers(null))
-  const providersQuery = createQuery(() => input.queryOptions.providers(pathKey(sdk().directory)))
+  // The directory catalog is lazy (see child-store providersEnabled), so this query only
+  // starts once the model picker has asked for that directory's own catalog. Its loading
+  // flag still lights up then, and the global query covers the composer's initial state.
+  const serverSync = useServerSync()
+  const providersQuery = createQuery(() => ({
+    ...input.queryOptions.providers(pathKey(sdk().directory)),
+    enabled: serverSync().providersActive(sdk().directory),
+  }))
 
   return createMemo<PromptInputControls>(() => {
     return {

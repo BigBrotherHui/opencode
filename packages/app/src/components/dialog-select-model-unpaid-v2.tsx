@@ -7,7 +7,7 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useTheme } from "@opencode-ai/ui/theme"
 import { createMemo, onCleanup, onMount, type Component, For, Show } from "solid-js"
 import { useLocal } from "@/context/local"
-import { useProviders } from "@/hooks/use-providers"
+import { useProviders, useActivateProviders } from "@/hooks/use-providers"
 import { decode64 } from "@/utils/base64"
 import { useLanguage } from "@/context/language"
 import { ModelTooltip } from "./model-tooltip"
@@ -23,6 +23,7 @@ export const DialogSelectModelUnpaidV2: Component<{ model?: ModelState }> = (pro
   const theme = useTheme()
   const directory = () => decode64(local.slug())
   const providers = useProviders(directory)
+  const activateProviders = useActivateProviders()
   const language = useLanguage()
   const modelKey = (item: ReturnType<ModelState["list"]>[number]) => `${item.provider.id}:${item.id}`
   const currentKey = createMemo(() => {
@@ -32,6 +33,10 @@ export const DialogSelectModelUnpaidV2: Component<{ model?: ModelState }> = (pro
   const isFree = (item: ReturnType<ModelState["list"]>[number]) =>
     item.provider.id === "opencode" && (!item.cost || item.cost.input === 0)
   const freeModels = createMemo(() => model.list().filter(isFree))
+
+  // This dialog renders as soon as it opens, which is the point that needs the
+  // directory's own catalog rather than the global fallback.
+  onMount(() => activateProviders(directory()))
 
   const openProviders = (provider?: string) => {
     void import("./dialog-connect-provider").then((x) => {

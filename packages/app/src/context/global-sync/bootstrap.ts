@@ -32,6 +32,7 @@ import type { State, VcsCache } from "./types"
 import type { ServerSession } from "../server-session"
 import {
   cmp,
+  directoryKey,
   normalizeAgentList,
   normalizePermissionRequest,
   normalizeProjectInfo,
@@ -218,17 +219,32 @@ function warmSessions(input: {
   ).then(() => undefined)
 }
 
+// Several components ask for the catalog as they mount, and their query functions
+// begin in separate microtask turns (each awaits `protocol` first), so TanStack Query
+// does not always join them into one request even with a fresh staleTime. Holding the
+// in-flight promise per key here collapses them into a single fetch; the entry is
+// dropped as soon as it settles so a later invalidation still re-fetches.
+const providerRequests = new Map<string, Promise<NormalizedProviderListResponse>>()
+
 export const loadProvidersQuery = (
   scope: ServerScope,
   directory: string | null,
   sdk: CatalogApi,
   legacy?: OpencodeClient,
   protocol?: Promise<ServerProtocol>,
-) =>
-  queryOptions({
-    queryKey: [scope, directory, "providers"],
-    queryFn: () =>
-      retry(async () => {
+) => {
+  const queryKey = [...scopedKey(scope, directory), "providers"]
+  return queryOptions({
+    queryKey,
+    // The catalog is the largest response the app fetches (megabytes uncompressed,
+    // and each directory resolves it separately), so a fresh window keeps a remount
+    // from re-fetching it. catalog.updated and config.updated still invalidate it.
+    staleTime: 60_000,
+    queryFn: () => {
+      const key = JSON.stringify(queryKey)
+      const inflight = providerRequests.get(key)
+      if (inflight) return inflight
+      const request = retry(async () => {
         if ((await protocol) === "v1" && legacy) {
           const result = await legacy.provider.list()
           return normalizeProviderList(result.data!)
@@ -240,8 +256,12 @@ export const loadProvidersQuery = (
           sdk.model.default(location),
         ])
         return normalizeProviderList(providers.data, models.data, defaultModel.data)
-      }),
+      }).finally(() => providerRequests.delete(key))
+      providerRequests.set(key, request)
+      return request
+    },
   })
+}
 
 type AgentListApi = {
   readonly list: (input?: AgentListInput) => Promise<AgentListOutput>
@@ -255,6 +275,14 @@ type ReferenceListApi = {
   readonly list: (input?: ReferenceListInput) => Promise<ReferenceListOutput>
 }
 
+// Callers reach these queries with the directory in two forms: the bootstrap path
+// passes the raw worktree, while the child store and the query options api pass
+// directoryKey. Windows spellings differ between them (`D:\x` vs `D:/x`), so without
+// normalizing here one project would cache the same response under two keys and fetch
+// it twice.
+const scopedKey = (scope: ServerScope, directory: string | null) =>
+  [scope, directory === null ? null : directoryKey(directory)] as const
+
 export const loadAgentsQuery = (
   scope: ServerScope,
   directory: string,
@@ -263,7 +291,7 @@ export const loadAgentsQuery = (
   protocol?: Promise<ServerProtocol>,
 ) =>
   queryOptions({
-    queryKey: [scope, directory, "agents"],
+    queryKey: [...scopedKey(scope, directory), "agents"],
     queryFn: () =>
       retry(async () => {
         if ((await protocol) === "v1" && legacy) return normalizeAgentList((await legacy.app.agents()).data ?? [])
@@ -302,7 +330,7 @@ export const loadPathQuery = (
   protocol?: Promise<ServerProtocol>,
 ) =>
   queryOptions<Path>({
-    queryKey: [scope, directory, "path"],
+    queryKey: [...scopedKey(scope, directory), "path"],
     queryFn: async () => {
       if ((await protocol) !== "v1")
         return { state: "", config: "", worktree: "", directory: directory ?? "", home: "" }
@@ -318,7 +346,7 @@ export const loadReferencesQuery = (
   protocol?: Promise<ServerProtocol>,
 ) =>
   queryOptions<ReferenceInfo[]>({
-    queryKey: [scope, directory, "references"] as const,
+    queryKey: [...scopedKey(scope, directory), "references"] as const,
     queryFn: () =>
       retry(async () => {
         if ((await protocol) === "v1" && legacy) return (await legacy.v2.reference.list()).data?.data ?? []
@@ -524,17 +552,11 @@ export async function bootstrapDirectory(input: {
           input.queryClient.fetchQuery(
             loadMcpResourcesQuery(input.scope, input.directory, input.api.mcp, input.sdk, input.protocol),
           )),
-      () =>
-        input.queryClient
-          .fetchQuery(loadProvidersQuery(input.scope, input.directory, input.api, input.sdk, input.protocol))
-          .catch((err) => {
-            const project = getFilename(input.directory)
-            showToast({
-              variant: "error",
-              title: input.translate("toast.project.reloadFailed.title", { project }),
-              description: formatServerError(err, input.translate),
-            })
-          }),
+      // The project provider catalog is deliberately not fetched here. It is the
+      // largest response the app downloads, and for a project without its own provider
+      // config it is byte-identical to the global catalog that bootstrapGlobal already
+      // fetched, so entering a project must not pay for it. The model picker calls
+      // childStore.activateProviders() when the project-scoped view is actually needed.
     ].filter(Boolean) as (() => Promise<any>)[]
 
     await waitForPaint()
