@@ -87,6 +87,21 @@ const PENDING_CACHE = "oc-pending"
 const PENDING_KEY = "/__notification-click"
 const PENDING_FRESH_MS = 5 * 60 * 1000
 
+// Same-origin diagnostics: lets the server log which click stages ran on the
+// device (iOS silently no-ops parts of the notification-click path).
+export function pushDebug(stage: string, url?: string) {
+  try {
+    void fetch("/pwa/push/debug", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ stage, url }),
+      keepalive: true,
+    }).catch(() => undefined)
+  } catch {
+    undefined
+  }
+}
+
 // The service worker records notification clicks in Cache Storage because iOS
 // may drop notification.data and ignore openWindow URLs. Consume it once on
 // boot: only entries explicitly marked as clicked and fresh are honored.
@@ -100,6 +115,7 @@ export async function consumePendingNotificationClick(): Promise<string | undefi
     const payload = (await response.json()) as { url?: string; ts?: number; clicked?: boolean }
     if (!payload || payload.clicked !== true || typeof payload.url !== "string") return undefined
     if (!payload.ts || Date.now() - payload.ts > PENDING_FRESH_MS) return undefined
+    pushDebug("app-consume", payload.url)
     return payload.url
   } catch {
     return undefined

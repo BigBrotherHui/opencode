@@ -40,6 +40,21 @@ async function readPending() {
   }
 }
 
+// Same-origin diagnostics: lets the server log which click stages actually ran
+// on the device (iOS silently no-ops parts of the notification-click path).
+function debugBeacon(data) {
+  try {
+    void fetch("/pwa/push/debug", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(data),
+      keepalive: true,
+    })
+  } catch {
+    undefined
+  }
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -148,6 +163,7 @@ self.addEventListener("notificationclick", (event) => {
       // iOS ignored the URL above or dropped notification.data entirely.
       await writePending({ url, ts: Date.now(), clicked: true })
       const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true })
+      debugBeacon({ stage: "sw-click", url, direct: !!direct, clients: clients.length })
       for (const client of clients) {
         if ("focus" in client) {
           client.postMessage({ type: "opencode:notification-click", url })

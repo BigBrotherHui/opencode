@@ -11,7 +11,7 @@ import { base64Encode } from "@opencode-ai/core/util/encode"
 import { decode64 } from "@/utils/base64"
 import { EventSessionError } from "@opencode-ai/sdk/v2"
 import { Persist, persisted } from "@/utils/persist"
-import { clearPendingNotificationClick, consumePendingNotificationClick, syncPushSubscription } from "@/utils/push"
+import { clearPendingNotificationClick, consumePendingNotificationClick, pushDebug, syncPushSubscription } from "@/utils/push"
 import { playSoundById } from "@/utils/sound"
 import { useGlobal } from "./global"
 import { ServerConnection, useServer } from "./server"
@@ -145,17 +145,33 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
     createEffect(() => {
       if (platform.platform === "desktop") return
       if (!("serviceWorker" in navigator)) return
-      void consumePendingNotificationClick().then((url) => {
-        if (url) navigate(url)
-      })
+      const consume = () => {
+        void consumePendingNotificationClick().then((url) => {
+          if (url) navigate(url)
+        })
+      }
+      consume()
       const onMessage = (event: MessageEvent) => {
         const data = event.data as { type?: string; url?: string } | undefined
         if (!data || data.type !== "opencode:notification-click" || typeof data.url !== "string") return
         void clearPendingNotificationClick()
+        pushDebug("app-message", data.url)
         navigate(data.url)
       }
+      // iOS may not let the service worker reach a running window; re-check the
+      // pending click whenever the app comes back to the foreground instead.
+      const onVisible = () => {
+        if (document.visibilityState !== "visible") return
+        consume()
+      }
       navigator.serviceWorker.addEventListener("message", onMessage)
-      onCleanup(() => navigator.serviceWorker.removeEventListener("message", onMessage))
+      document.addEventListener("visibilitychange", onVisible)
+      window.addEventListener("focus", onVisible)
+      onCleanup(() => {
+        navigator.serviceWorker.removeEventListener("message", onMessage)
+        document.removeEventListener("visibilitychange", onVisible)
+        window.removeEventListener("focus", onVisible)
+      })
     })
 
     const ensure = (key: ServerConnection.Key) => {
