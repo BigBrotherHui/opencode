@@ -1,7 +1,10 @@
 import { Config } from "@/config/config"
 import { GlobalBus, type GlobalEvent as GlobalBusEvent } from "@/bus/global"
 import { EffectBridge } from "@/effect/bridge"
+import { AppState } from "@opencode-ai/core/app-state"
+import { AppState as AppStateEvent } from "@opencode-ai/schema/app-state"
 import { EventV2 } from "@opencode-ai/core/event"
+import { EventV2Bridge } from "@/event-v2-bridge"
 import { Installation } from "@/installation"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
@@ -61,7 +64,9 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
   Effect.gen(function* () {
     const config = yield* Config.Service
     const installation = yield* Installation.Service
+    const appState = yield* AppState.Service
     const bridge = yield* EffectBridge.make()
+    const events = yield* EventV2Bridge.Service
 
     const health = Effect.fn("GlobalHttpApi.health")(function* () {
       return { healthy: true as const, version: InstallationVersion }
@@ -115,6 +120,18 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       return HttpServerResponse.jsonUnsafe(result)
     })
 
+    const appStateGet = Effect.fn("GlobalHttpApi.appStateGet")(function* (ctx: { params: { scope: string } }) {
+      return (yield* appState.get(ctx.params.scope)) ?? null
+    })
+
+    const appStateSet = Effect.fn("GlobalHttpApi.appStateSet")(function* (ctx: {
+      params: { scope: string }
+      payload: unknown
+    }) {
+      yield* appState.set(ctx.params.scope, ctx.payload)
+      yield* events.publish(AppStateEvent.Event.Updated, { scope: ctx.params.scope })
+    })
+
     return handlers
       .handle("health", health)
       .handleRaw("event", event)
@@ -122,5 +139,7 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("configUpdate", configUpdate)
       .handle("dispose", dispose)
       .handle("upgrade", upgrade)
+      .handle("appStateGet", appStateGet)
+      .handle("appStateSet", appStateSet)
   }),
 )

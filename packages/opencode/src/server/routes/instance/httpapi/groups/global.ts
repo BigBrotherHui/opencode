@@ -71,7 +71,17 @@ export const GlobalPaths = {
   config: "/global/config",
   dispose: "/global/dispose",
   upgrade: "/global/upgrade",
+  appState: "/global/app-state/:scope",
 } as const
+
+const AppStateParams = Schema.Struct({ scope: Schema.String })
+
+// Shared client state lives behind an opaque JSON body: the server stores it without
+// interpreting it, so a client can add a new shared preference without a migration.
+// Reading a scope that was never written returns null rather than failing, which lets
+// clients treat "no value yet" as an ordinary state.
+const AppStateValue = Schema.Unknown
+const AppStateReadResult = Schema.NullOr(AppStateValue)
 
 export const GlobalApi = HttpApi.make("global").add(
   HttpApiGroup.make("global")
@@ -132,6 +142,29 @@ export const GlobalApi = HttpApi.make("global").add(
           identifier: "global.upgrade",
           summary: "Upgrade opencode",
           description: "Upgrade opencode to the specified version.",
+        }),
+      ),
+      HttpApiEndpoint.get("appStateGet", GlobalPaths.appState, {
+        params: AppStateParams,
+        success: described(AppStateReadResult, "Shared app state, or null when never written"),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.appState.get",
+          summary: "Get shared app state",
+          description:
+            "Read the shared client state for a scope. Every client connected to this server sees the same value.",
+        }),
+      ),
+      HttpApiEndpoint.put("appStateSet", GlobalPaths.appState, {
+        params: AppStateParams,
+        payload: AppStateValue,
+        success: described(Schema.Void, "Stored"),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.appState.set",
+          summary: "Set shared app state",
+          description:
+            "Replace the shared client state for a scope and notify other clients so they refresh.",
         }),
       ),
     )
