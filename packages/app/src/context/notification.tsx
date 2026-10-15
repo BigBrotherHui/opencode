@@ -11,6 +11,7 @@ import { base64Encode } from "@opencode-ai/core/util/encode"
 import { decode64 } from "@/utils/base64"
 import { EventSessionError } from "@opencode-ai/sdk/v2"
 import { Persist, persisted } from "@/utils/persist"
+import { showToast } from "@/utils/toast"
 import { clearPendingNotificationClick, consumePendingNotificationClick, pushDebug, syncPushSubscription } from "@/utils/push"
 import { playSoundById } from "@/utils/sound"
 import { useGlobal } from "./global"
@@ -145,16 +146,14 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
     createEffect(() => {
       if (platform.platform === "desktop") return
       if (!("serviceWorker" in navigator)) return
-      // SPA navigation can silently no-op on some foreground transitions; verify
-      // the address after navigate() and fall back to a hard load of the deep
-      // link, which cold-boots the app straight into the target session.
+      // A document navigation adopts the notification's exact session URL,
+      // independently of the currently selected tab.
+      let opening: string | undefined
       const goto = (url: string, stage?: string) => {
+        if (opening === url) return
+        opening = url
         if (stage) pushDebug(stage, url)
-        navigate(url)
-        window.setTimeout(() => {
-          pushDebug("app-location", window.location.pathname)
-          if (window.location.pathname !== url) window.location.assign(url)
-        }, 400)
+        window.location.assign(url)
       }
       const consume = () => {
         void consumePendingNotificationClick().then((url) => {
@@ -425,8 +424,19 @@ function createServerNotificationState(input: {
 
       const href = `/${base64Encode(directory)}/session/${sessionID}`
       if (settings.notifications.agent()) {
+        if (platform.platform === "web" && document.visibilityState === "visible") {
+          if (!viewedInCurrentSession(directory, sessionID)) {
+            showToast({
+              title: language.t("notification.session.responseReady.title"),
+              description: session.title ?? sessionID,
+              duration: 15000,
+              actions: [{ label: language.t("common.open"), onClick: () => window.location.assign(href) }],
+            })
+          }
+          return
+        }
         void platform.notify(language.t("notification.session.responseReady.title"), session.title ?? sessionID, () =>
-          input.navigate(href),
+          platform.platform === "web" ? window.location.assign(href) : input.navigate(href),
         )
       }
     })

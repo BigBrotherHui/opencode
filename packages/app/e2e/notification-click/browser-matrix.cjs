@@ -70,7 +70,10 @@ self.addEventListener("message", event => {
       await page.evaluate((url) => navigator.serviceWorker.ready.then((registration) => {
         registration.active.postMessage({ type: "TEST_NOTIFICATION_CLICK", url })
       }), target)
-      await page.waitForURL((url) => url.pathname === target, { timeout: 10000 })
+      // Broadcast and direct-message delivery can each request a document
+      // navigation. Wait for the settled URL rather than one specific load.
+      await page.waitForTimeout(3000)
+      assert.equal(new URL(page.url()).pathname, target)
       assert.deepEqual(errors, [], `${name}: unexpected page errors`)
       console.log(`PASS ${name}: switch sessions in a live page, then handle notification click`)
     } finally {
