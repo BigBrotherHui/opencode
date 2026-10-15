@@ -243,3 +243,10 @@ rail 底部（栅格列之下）加 `arrow-down-to-line` 按钮，点击复用 `
 1. **VAPID subject 不能用 `.local`**：`mailto:push@opencode.local` 被 Apple 推送服务以 403 `BadJwtToken` 拒绝；改成 `mailto:push@example.com` 后 201 全过（push-daemon.js 已修，UI 进程已重启）。排查法：用独立 node 脚本逐个 subject 试发。
 2. **iOS 通知授权只能由点击触发**：`settings.notifications.agent` 默认就是 `true`，导致开关"默认开着但从未被点击过"→ 授权弹窗从未出现 → 无订阅。解法：把开关**关掉再打开**（一次点击）即完成授权 + 订阅；服务器日志出现 `push: subscription registered`（端点为 web.push.apple.com）。测试推送已被 Apple 受理（201）且**用户已在 iPhone 上确认收到**。PWA + Web Push 全链路打通。
 3. 重启 UI 进程的稳妥方式：改完 serve-ui-build.js/push-daemon.js 后 `Stop-Process ui.pid` + `Start-Process node serve-ui-build.js`（只重启 UI，不动 3910 API）；注意从 opencode 的 bash 工具里带 `-RedirectStandardOutput` 启动会被工具句柄检查掐掉，命令本身已生效、直接查端口/日志即可。
+
+### 2026-10-16 凌晨 — "收不到推送"的两个真因（已修）
+
+1. **守护连错流**：实例级 `/event` 按目录过滤（handlers/event.ts:37 `event.location?.directory === instance.directory`），裸连（无 directory 上下文）只能收到 server cwd 那个默认实例的事件 → 用户会话的事件全部被滤掉。**全局流是 `/global/event`**（groups/global.ts），但它的事件包了一层 GlobalBus 信封 `{"directory":...,"payload":{"id","type","properties"}}`（且有 type:"sync" 的重复条目要跳过），解析时取 `entry.payload`。守护已改为连 `/global/event` + 解析信封。
+2. **8 秒防抖已移除**（用户要求"一结束就发"）：改为 idle 事件 → 立刻查会话 → 子会话（parentID）过滤 → 立即 send；用 per-session 5s 去重代替防抖，防止同一会话的重复 idle 事件发多条。
+3. **人工触发 idle 的测试技巧**：`POST /session/{id}/abort` 对空闲会话也可用——cancel 无 runner 时仍会 `status.set(idle)` → publish `Event.Idle`，可零成本验证推送链路（日志出现 `push: turn complete`）。
+4. `/global/event` 实测事件样例：`data: {"directory":"D:\\PrivateProject\\opencode","project":"...","payload":{"id":"evt_...","type":"session.idle","properties":{"sessionID":"ses_..."}}}`。
