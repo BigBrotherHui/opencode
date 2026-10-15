@@ -782,6 +782,8 @@ export const dict = {
   "session.messages.loadEarlier": "Charger les messages précédents",
   "session.messages.loading": "Chargement des messages...",
   "session.messages.jumpToLatest": "Aller au message le plus récent",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Ajouter {{selection}} au contexte",
   "session.todo.title": "Tâches",
   "session.todo.collapse": "Réduire",

@@ -789,6 +789,8 @@ export const dict = {
   "session.messages.loadEarlier": "Korábbi üzenetek betöltése",
   "session.messages.loading": "Üzenetek betöltése...",
   "session.messages.jumpToLatest": "Ugrás a legújabbra",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Adja hozzá a {{selection}}-t a kontextushoz",
   "session.todo.title": "Feladatok",
   "session.todo.collapse": "Összeomlás",

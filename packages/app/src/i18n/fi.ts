@@ -680,6 +680,8 @@ export const dict = {
   "session.messages.loadEarlier": "Lataa aikaisemmat viestit",
   "session.messages.loading": "Ladataan viestejä...",
   "session.messages.jumpToLatest": "Siirry uusimpaan",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Lisää {{selection}} kontekstiin",
   "session.todo.title": "Tehtävät",
   "session.todo.collapse": "Kutista",

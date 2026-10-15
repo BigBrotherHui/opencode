@@ -705,6 +705,8 @@ export const dict = {
   "session.messages.loadEarlier": "Last inn tidligere meldinger",
   "session.messages.loading": "Laster meldinger...",
   "session.messages.jumpToLatest": "Hopp til nyeste",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
 
   "session.context.addToContext": "Legg til {{selection}} i kontekst",
   "session.todo.title": "Oppgaver",

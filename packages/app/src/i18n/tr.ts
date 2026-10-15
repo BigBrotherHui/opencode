@@ -831,6 +831,8 @@ export const dict = {
   "session.messages.loadEarlier": "Önceki mesajları yükle",
   "session.messages.loading": "Mesajlar yükleniyor...",
   "session.messages.jumpToLatest": "En sona atla",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
 
   "session.context.addToContext": "{{selection}} bağlama ekle",
   "session.todo.title": "Görevler",

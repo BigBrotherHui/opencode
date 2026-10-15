@@ -794,6 +794,8 @@ export const dict = {
   "session.messages.loadEarlier": "پہلے کے پیغامات لوڈ کریں۔",
   "session.messages.loading": "پیغامات لوڈ ہو رہے ہیں...",
   "session.messages.jumpToLatest": "تازہ ترین پر جائیں",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "{{selection}} کو سیاق و سباق میں شامل کریں۔",
   "session.todo.title": "زیر التوا کام",
   "session.todo.collapse": "سمیٹیں",

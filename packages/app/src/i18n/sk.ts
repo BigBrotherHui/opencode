@@ -780,6 +780,8 @@ export const dict = {
   "session.messages.loadEarlier": "Načítať staršie správy",
   "session.messages.loading": "Načítavam správy...",
   "session.messages.jumpToLatest": "Prejsť na najnovšie",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Pridať {{selection}} do kontextu",
   "session.todo.title": "Úlohy",
   "session.todo.collapse": "Zbaliť",

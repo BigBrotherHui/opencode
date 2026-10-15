@@ -784,6 +784,8 @@ export const dict: Record<string, string> = {
   "session.messages.loadEarlier": "पहिलेका सन्देशहरू लोड गर्नुहोस्",
   "session.messages.loading": "सन्देशहरू लोड गर्दै...",
   "session.messages.jumpToLatest": "नवीनतममा जानुहोस्",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "सन्दर्भमा {{selection}} थप्नुहोस्",
   "session.todo.title": "गर्नुपर्ने कामहरू",
   "session.todo.collapse": "संक्षिप्त गर्नुहोस्",

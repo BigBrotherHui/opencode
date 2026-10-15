@@ -795,6 +795,8 @@ export const dict: Record<string, string> = {
   "session.messages.loadEarlier": "ཧེ་མའི་འཕྲིན་དོན་ཚུ་མངོན་གསལ་འབད།",
   "session.messages.loading": "འཕྲིན་དོན་ཚུ་མངོན་གསལ་འབད་དོ།...",
   "session.messages.jumpToLatest": "གསར་ཤོས་ལུ་མཆོངས།",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "{{selection}} སྐབས་དོན་ལུ་ཁ་སྐོང་བརྐྱབ།",
   "session.todo.title": "ཊོ་ཌོས།",
   "session.todo.collapse": "རམ་པ",

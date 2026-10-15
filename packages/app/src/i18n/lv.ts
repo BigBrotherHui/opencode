@@ -784,6 +784,8 @@ export const dict = {
   "session.messages.loadEarlier": "Ielādēt agrākos ziņojumus",
   "session.messages.loading": "Notiek ziņojumu ielāde...",
   "session.messages.jumpToLatest": "Pāriet uz jaunāko",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Pievienot {{selection}} kontekstam",
   "session.todo.title": "Darāmais",
   "session.todo.collapse": "Sakļaut",

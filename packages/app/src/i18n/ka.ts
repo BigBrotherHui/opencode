@@ -782,6 +782,8 @@ export const dict = {
   "session.messages.loadEarlier": "ადრე შეტყობინებების ჩატვირთვა",
   "session.messages.loading": "იტვირთება შეტყობინებები...",
   "session.messages.jumpToLatest": "გადადით უახლესზე",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "დაამატე {{selection}} კონტექსტში",
   "session.todo.title": "დავალებები",
   "session.todo.collapse": "ჩაკეცვა",

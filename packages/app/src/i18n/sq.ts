@@ -785,6 +785,8 @@ export const dict = {
   "session.messages.loadEarlier": "Ngarko mesazhet e mëparshme",
   "session.messages.loading": "Po ngarkon mesazhet...",
   "session.messages.jumpToLatest": "Kalo tek e fundit",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Shtoni {{selection}} në kontekst",
   "session.todo.title": "Detyrat",
   "session.todo.collapse": "Kolapsi",

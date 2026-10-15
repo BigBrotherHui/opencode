@@ -771,6 +771,8 @@ export const dict = {
   "session.messages.loadEarlier": "Załaduj wcześniejsze wiadomości",
   "session.messages.loading": "Ładowanie wiadomości...",
   "session.messages.jumpToLatest": "Przejdź do najnowszych",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Dodaj {{selection}} do kontekstu",
   "session.todo.title": "Zadania",
   "session.todo.collapse": "Zwiń",

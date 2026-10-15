@@ -77,6 +77,7 @@ import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { createTimelineProjection } from "./projection"
 import { MessageComment, SummaryDiff, TimelineRow, TimelineRowMap } from "./rows"
 import { filterVirtualIndexes } from "./virtual-items"
+import { MessageRail, type RailMessage } from "./message-rail"
 
 const emptyMessages: MessageType[] = []
 const emptyParts: PartType[] = []
@@ -497,12 +498,68 @@ export function MessageTimeline(props: {
     () => new Map(virtualizer.getVirtualItems().map((item) => [item.key, item] as const)),
   )
   const virtualRowKeys = createMemo(() => virtualizer.getVirtualItems().map((item) => item.key as string))
-  createEffect(() => {
-    props.setRevealMessage?.((id) => {
-      const index = messageRowIndex().get(id)
-      if (index === undefined) return
-      virtualizer.scrollToIndex(index, { align: "center" })
+
+  const railMessages = createMemo<RailMessage[]>(() =>
+    props.userMessages.map((message) => {
+      const part = getMsgParts(message.id).find(
+        (item) => item.type === "text" && !item.synthetic && !item.ignored,
+      )
+      const text = part?.type === "text" ? part.text.replace(/\s+/g, " ").trim() : ""
+      return {
+        id: message.id,
+        text,
+        time: new Date(message.time.created).toLocaleTimeString(undefined, { timeStyle: "short" }),
+      }
+    }),
+  )
+
+  const [railActive, setRailActive] = createSignal<string | undefined>()
+  let railFrame: number | undefined
+  const computeRailActive = () => {
+    const root = listRoot()
+    if (!root) return
+    const box = root.getBoundingClientRect()
+    const rows = root.querySelectorAll<HTMLElement>('[data-timeline-row="UserMessage"]')
+    for (const row of rows) {
+      if (row.getBoundingClientRect().bottom <= box.top + 24) continue
+      setRailActive(row.dataset.messageId)
+      return
+    }
+    setRailActive(undefined)
+  }
+  const scheduleRailActive = () => {
+    if (railFrame !== undefined) return
+    railFrame = requestAnimationFrame(() => {
+      railFrame = undefined
+      computeRailActive()
     })
+  }
+  const railActiveID = () => railActive() ?? props.userMessages.at(-1)?.id
+
+  // Virtual rows mount after the first paint, so the first computation sees an empty
+  // DOM. Re-run once on mount and again after the initial overscan frame settles.
+  onMount(() => {
+    scheduleRailActive()
+    requestAnimationFrame(() => requestAnimationFrame(() => computeRailActive()))
+  })
+
+  createEffect(() => {
+    timelineRows().length
+    scheduleRailActive()
+  })
+
+  const revealMessage = (id: string) => {
+    const index = messageRowIndex().get(id)
+    if (index === undefined) return
+    virtualizer.scrollToIndex(index, { align: "center" })
+  }
+  const jumpToMessage = (id: string) => {
+    props.onMarkScrollGesture(listRoot())
+    revealMessage(id)
+  }
+
+  createEffect(() => {
+    props.setRevealMessage?.(revealMessage)
     props.setScrollToEnd?.(() => virtualizer.scrollToEnd())
     props.setHistoryAnchor?.({ capture: capturePrependAnchor, restore: restorePrependAnchor })
   })
@@ -541,6 +598,7 @@ export function MessageTimeline(props: {
 
   onCleanup(() => {
     clearPrependAnchor()
+    if (railFrame !== undefined) cancelAnimationFrame(railFrame)
     timelineCache.delete(ownerSessionKey)
     timelineCache.set(ownerSessionKey, { measurements: virtualizer.takeSnapshot(), toolOpen: { ...toolOpen } })
     while (timelineCache.size > 16) timelineCache.delete(timelineCache.keys().next().value!)
@@ -632,6 +690,7 @@ export function MessageTimeline(props: {
   const handleListScroll = (event: Event & { currentTarget: HTMLDivElement }) => {
     if (prependLoading) updatePrependAnchor()
     props.onScheduleScrollState(event.currentTarget)
+    scheduleRailActive()
     props.onHistoryScroll()
     if (!props.hasScrollGesture()) return
     props.onUserScroll()
@@ -1298,6 +1357,12 @@ export function MessageTimeline(props: {
 
   return (
     <div class="relative w-full h-full min-w-0">
+      <MessageRail
+        messages={railMessages}
+        activeID={railActiveID}
+        onJump={jumpToMessage}
+        onJumpLatest={props.onResumeScroll}
+      />
       <div
         class="absolute left-1/2 -translate-x-1/2 z-[60] pointer-events-none transition-all duration-200 ease-out"
         classList={{

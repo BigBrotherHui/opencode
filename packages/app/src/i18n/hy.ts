@@ -787,6 +787,8 @@ export const dict = {
   "session.messages.loadEarlier": "Բեռնել ավելի վաղ հաղորդագրությունները",
   "session.messages.loading": "Բեռնվում է հաղորդագրություններ...",
   "session.messages.jumpToLatest": "Անցնել վերջին",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Ավելացնել {{selection}} համատեքստում",
   "session.todo.title": "Անելիքներ",
   "session.todo.collapse": "Ծալել",

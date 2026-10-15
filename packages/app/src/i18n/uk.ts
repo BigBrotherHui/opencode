@@ -853,6 +853,8 @@ export const dict = {
   "session.messages.loadEarlier": "Завантажити раніші повідомлення",
   "session.messages.loading": "Завантаження повідомлень...",
   "session.messages.jumpToLatest": "Перейти до останніх",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
 
   "session.context.addToContext": "Додати {{selection}} до контексту",
   "session.todo.title": "Завдання",

@@ -787,6 +787,8 @@ export const dict = {
   "session.messages.loadEarlier": "Ladda tidigare meddelanden",
   "session.messages.loading": "Läser in meddelanden...",
   "session.messages.jumpToLatest": "Hoppa till senaste",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Lägg till {{selection}} i kontexten",
   "session.todo.title": "Att göra",
   "session.todo.collapse": "Fäll ihop",

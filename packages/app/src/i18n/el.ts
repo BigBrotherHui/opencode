@@ -790,6 +790,8 @@ export const dict = {
   "session.messages.loadEarlier": "Φόρτωση προηγούμενων μηνυμάτων",
   "session.messages.loading": "Φόρτωση μηνυμάτων...",
   "session.messages.jumpToLatest": "Μετάβαση στο πιο πρόσφατο",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Προσθήκη {{selection}} στο περιβάλλον",
   "session.todo.title": "Εκκρεμότητες",
   "session.todo.collapse": "Σύμπτυξη",

@@ -782,6 +782,8 @@ export const dict: Record<string, string> = {
   "session.messages.loadEarlier": "আগের বার্তা লোড করুন",
   "session.messages.loading": "বার্তা লোড হচ্ছে...",
   "session.messages.jumpToLatest": "সর্বশেষে ঝাঁপ দাও",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "প্রসঙ্গে {{selection}} যোগ করুন",
   "session.todo.title": "টোডোস",
   "session.todo.collapse": "সঙ্কুচিত",

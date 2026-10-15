@@ -792,6 +792,8 @@ export const dict = {
   "session.messages.loadEarlier": "पहले के संदेश लोड करें",
   "session.messages.loading": "संदेश लोड हो रहे हैं...",
   "session.messages.jumpToLatest": "नवीनतम पर जाएं",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "{{selection}} को कॉन्टेक्स्ट में जोड़ें",
   "session.todo.title": "कार्य सूची",
   "session.todo.collapse": "संकुचित करें",

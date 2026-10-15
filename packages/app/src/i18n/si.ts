@@ -779,6 +779,8 @@ export const dict: Record<string, string> = {
   "session.messages.loadEarlier": "කලින් පණිවිඩ පූරණය කරන්න",
   "session.messages.loading": "පණිවිඩ පූරණය කරමින්...",
   "session.messages.jumpToLatest": "නවතම වෙත පනින්න",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "සන්දර්භය වෙත {{selection}} එක් කරන්න",
   "session.todo.title": "ටෝඩෝස්",
   "session.todo.collapse": "හකුළන්න",

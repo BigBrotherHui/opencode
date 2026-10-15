@@ -787,6 +787,8 @@ export const dict = {
   "session.messages.loadEarlier": "Avvalgi xabarlarni yuklang",
   "session.messages.loading": "Xabarlar yuklanmoqda...",
   "session.messages.jumpToLatest": "Eng oxirgisiga oʻtish",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Kontekstga {{selection}} qo'shing",
   "session.todo.title": "Vazifalar",
   "session.todo.collapse": "Yiqilish",

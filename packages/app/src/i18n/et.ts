@@ -778,6 +778,8 @@ export const dict = {
   "session.messages.loadEarlier": "Laadige varasemad sõnumid",
   "session.messages.loading": "Sõnumite laadimine...",
   "session.messages.jumpToLatest": "Hüppa uusimale",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Lisage konteksti {{selection}}",
   "session.todo.title": "Ülesanded",
   "session.todo.collapse": "Ahenda",

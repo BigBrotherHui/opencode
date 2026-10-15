@@ -792,6 +792,8 @@ export const dict = {
   "session.messages.loadEarlier": "Tải tin nhắn trước đó",
   "session.messages.loading": "Đang tải tin nhắn...",
   "session.messages.jumpToLatest": "Chuyển đến mới nhất",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Thêm {{selection}} vào ngữ cảnh",
   "session.todo.title": "việc cần làm",
   "session.todo.collapse": "Thu gọn",

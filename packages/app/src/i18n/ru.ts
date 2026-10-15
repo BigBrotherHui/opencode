@@ -824,6 +824,8 @@ export const dict = {
   "session.messages.loadEarlier": "Загрузить предыдущие сообщения",
   "session.messages.loading": "Загрузка сообщений...",
   "session.messages.jumpToLatest": "Перейти к последнему",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
 
   "session.context.addToContext": "Добавить {{selection}} в контекст",
   "session.todo.title": "Задачи",

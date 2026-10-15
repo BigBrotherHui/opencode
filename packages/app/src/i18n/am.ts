@@ -769,6 +769,8 @@ export const dict = {
   "session.messages.loadEarlier": "የቀድሞ መልዕክቶችን ጫን",
   "session.messages.loading": "መልእክቶችን በመጫን ላይ...",
   "session.messages.jumpToLatest": "ወደ የቅርብ ጊዜ ዝለል",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "{{selection}}ን ወደ አውድ አክል",
   "session.todo.title": "የሚደረጉ ሥራዎች",
   "session.todo.collapse": "ስብስብ",

@@ -782,6 +782,8 @@ export const dict = {
   "session.messages.loadEarlier": "Naloži prejšnja sporočila",
   "session.messages.loading": "Nalaganje sporočil ...",
   "session.messages.jumpToLatest": "Skoči na najnovejšo",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Dodajte {{selection}} v kontekst",
   "session.todo.title": "Opravila",
   "session.todo.collapse": "Strni",

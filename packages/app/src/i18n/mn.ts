@@ -788,6 +788,8 @@ export const dict = {
   "session.messages.loadEarlier": "Өмнөх мессежүүдийг ачаалах",
   "session.messages.loading": "Мессежүүдийг ачаалж байна...",
   "session.messages.jumpToLatest": "Сүүлийнх рүү шилжих",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Контекст {{selection}} нэмнэ үү",
   "session.todo.title": "Тодос",
   "session.todo.collapse": "Нурах",

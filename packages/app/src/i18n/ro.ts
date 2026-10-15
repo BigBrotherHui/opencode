@@ -784,6 +784,8 @@ export const dict = {
   "session.messages.loadEarlier": "Încarcă mesajele anterioare",
   "session.messages.loading": "Se încarcă mesajele...",
   "session.messages.jumpToLatest": "Sari la cele mai recente",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Adaugă {{selection}} la context",
   "session.todo.title": "Sarcini",
   "session.todo.collapse": "Restrânge",

@@ -777,6 +777,8 @@ export const dict = {
   "session.messages.loadEarlier": "ໂຫຼດຂໍ້ຄວາມກ່ອນໜ້ານີ້",
   "session.messages.loading": "ກຳລັງໂຫຼດຂໍ້ຄວາມ...",
   "session.messages.jumpToLatest": "ຂ້າມໄປຫາຫຼ້າສຸດ",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "ເພີ່ມ {{selection}} ໃສ່ບໍລິບົດ",
   "session.todo.title": "ສິ່ງທີ່ຕ້ອງເຮັດ",
   "session.todo.collapse": "ຫຍໍ້ລົງ",

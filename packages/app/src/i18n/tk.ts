@@ -782,6 +782,8 @@ export const dict = {
   "session.messages.loadEarlier": "Öňki habarlary ýükläň",
   "session.messages.loading": "Habarlary ýüklemek ...",
   "session.messages.jumpToLatest": "Iň soňkusyna geçiň",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Mazmuna {{selection}} goşuň",
   "session.todo.title": "Edilmeli işler",
   "session.todo.collapse": "Apseykylmak",

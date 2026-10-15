@@ -785,6 +785,8 @@ export const dict = {
   "session.messages.loadEarlier": "Паёмҳои қаблиро бор кунед",
   "session.messages.loading": "Паёмҳо бор карда мешаванд...",
   "session.messages.jumpToLatest": "Ба охирин гузаред",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Ба контекст {{selection}} илова кунед",
   "session.todo.title": "Тодос",
   "session.todo.collapse": "Фурӯпошӣ",

@@ -788,6 +788,8 @@ export const dict = {
   "session.messages.loadEarlier": "Зареди по-ранни съобщения",
   "session.messages.loading": "Съобщенията се зареждат...",
   "session.messages.jumpToLatest": "Преминете към най-новото",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Добавете {{selection}} към контекста",
   "session.todo.title": "Задачи",
   "session.todo.collapse": "Свиване",

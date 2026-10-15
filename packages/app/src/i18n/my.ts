@@ -790,6 +790,8 @@ export const dict = {
   "session.messages.loadEarlier": "အစောပိုင်းမက်ဆေ့ချ်များကို တင်ပါ။",
   "session.messages.loading": "မက်ဆေ့ချ်များကို ဖွင့်နေသည်...",
   "session.messages.jumpToLatest": "နောက်ဆုံးသို့ ခုန်ပါ။",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "{{selection}} ကို ဆက်စပ်အကြောင်းအရာထဲ ထည့်ပါ။",
   "session.todo.title": "လုပ်စရာများ",
   "session.todo.collapse": "ခေါက်သိမ်းပါ။",

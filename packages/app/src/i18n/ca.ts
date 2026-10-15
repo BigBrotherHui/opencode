@@ -788,6 +788,8 @@ export const dict = {
   "session.messages.loadEarlier": "Carregueu missatges anteriors",
   "session.messages.loading": "S'estan carregant els missatges...",
   "session.messages.jumpToLatest": "Ves a l'últim",
+  "session.messages.outline": "Messages",
+  "session.messages.outlineJump": "Jump to message",
   "session.context.addToContext": "Afegeix {{selection}} al context",
   "session.todo.title": "Tots",
   "session.todo.collapse": "Col·lapse",
