@@ -1659,6 +1659,25 @@ describe("ProviderTransform.schema - gemini type arrays", () => {
     expect(result.properties.status.type).toBeUndefined()
     expect(result.properties.hook_id.type).toBe("number")
   })
+
+  test("moves array items into the array branch of a nullable type array", () => {
+    // Some MCP servers emit `type: ["array","null"]` with a sibling `items`.
+    // Gemini rejects an `anyOf` whose array branch has no `items`, so the
+    // array keywords must travel with the array branch.
+    const schema = {
+      type: "object",
+      properties: {
+        kinds: { type: ["array", "null"], items: { type: "string" }, description: "filter kinds" },
+      },
+    } as any
+
+    const result = ProviderTransform.schema(geminiModel, schema) as any
+
+    expect(result.properties.kinds.type).toBeUndefined()
+    expect(result.properties.kinds.items).toBeUndefined()
+    expect(result.properties.kinds.nullable).toBe(true)
+    expect(result.properties.kinds.anyOf).toEqual([{ type: "array", items: { type: "string" } }])
+  })
 })
 
 describe("ProviderTransform.schema - gemini combiner nodes", () => {

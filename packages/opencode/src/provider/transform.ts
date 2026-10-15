@@ -1678,8 +1678,15 @@ export function schema(model: Provider.Model, schema: JSONSchema7): JSONSchema7 
         if (nonNull.length === 0) {
           result.type = "null"
         } else {
+          // Array keywords (items) only validate on a node whose type is `array`,
+          // so they must move into the array branch instead of staying orphaned
+          // beside `anyOf` (Gemini rejects that with INVALID_ARGUMENT).
+          const items = result.items
           delete result.type
-          result.anyOf = nonNull.map((entry: unknown) => ({ type: entry }))
+          result.anyOf = nonNull.map((entry: unknown) =>
+            entry === "array" ? { type: entry, items: items ?? { type: "string" } } : { type: entry },
+          )
+          if (items !== undefined) delete result.items
           if (hasNull) result.nullable = true
         }
       }
