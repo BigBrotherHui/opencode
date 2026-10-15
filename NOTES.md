@@ -250,3 +250,10 @@ rail 底部（栅格列之下）加 `arrow-down-to-line` 按钮，点击复用 `
 2. **8 秒防抖已移除**（用户要求"一结束就发"）：改为 idle 事件 → 立刻查会话 → 子会话（parentID）过滤 → 立即 send；用 per-session 5s 去重代替防抖，防止同一会话的重复 idle 事件发多条。
 3. **人工触发 idle 的测试技巧**：`POST /session/{id}/abort` 对空闲会话也可用——cancel 无 runner 时仍会 `status.set(idle)` → publish `Event.Idle`，可零成本验证推送链路（日志出现 `push: turn complete`）。
 4. `/global/event` 实测事件样例：`data: {"directory":"D:\\PrivateProject\\opencode","project":"...","payload":{"id":"evt_...","type":"session.idle","properties":{"sessionID":"ses_..."}}}`。
+
+### 2026-10-16 — 推送点击只回首页：payload url 深链修复
+
+**现象：** 通知能收到，但点击只回到 opencode 首页，不跳会话。
+**根因：** push-daemon.js 发送负载里 `url` 硬编码为 `'/'`。
+**修复：** url 改为会话深链 `/{base64UrlEncode(session.directory)}/session/{session.id}` —— base64 是 URL-safe 变体（`+→-`、`/→_`、去 `=`），与 `core/util/encode` 的 `base64Encode` 一致；SW 的 notificationclick（navigate/openWindow）无需改动。
+**验证：** 日志 `push: turn complete ... -> /RDpcUHJpdmF0ZVByb2plY3Rcb3BlbmNvZGU/session/ses_...`。
