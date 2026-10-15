@@ -234,7 +234,7 @@ rail 底部（栅格列之下）加 `arrow-down-to-line` 按钮，点击复用 `
 - 已验：typecheck 通过；`/pwa/push/key` 返回公钥；subscribe/unsubscribe 204+文件落盘；UI 日志 `push: SSE connected (200)`。手机端最终 E2E（通知到达）待 HTTPS 生效后在手机上验证。
 - 构建：手机 `index-BUuvNfWA.js`；桌面 renderer `main-DX89x21v.js`（exe 已重打包）。
 
-**未提交：** app 侧 M = entry.tsx / notification.tsx / settings-general.tsx / settings-v2/general.tsx + 新文件 sw.js、utils/push.ts（另有此前 followup 的 3 个文件）；opencode-web 侧新文件 push-daemon.js、package.json、push-keys.json（scripts 非仓库）。
+**未提交：** ~~opencode-web 侧新文件 push-daemon.js、package.json、push-keys.json（scripts 非仓库）~~ → **现已修正**：opencode-web 是独立 git 仓库，已推送至 `github.com/BigBrotherHui/opencode-web`（私有）；push-daemon.js/serve-ui-build.js 已入库，密钥/订阅/日志/PID 被 .gitignore 排除。opencode 侧分支 `sync-open-projects` 亦已推送到 fork。
 
 **前置条件：** iOS 需 16.4+ 且**已添加到主屏**才允许 Web Push；Android Chrome 需 GMS 推送。推送与「agent 通知」开关绑定（关掉即退订 + 服务端删除）。
 
