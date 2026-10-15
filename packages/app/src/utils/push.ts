@@ -82,3 +82,35 @@ function post(path: string, body: unknown) {
     body: JSON.stringify(body),
   }).catch(() => undefined)
 }
+
+const PENDING_CACHE = "oc-pending"
+const PENDING_KEY = "/__notification-click"
+const PENDING_FRESH_MS = 5 * 60 * 1000
+
+// The service worker records notification clicks in Cache Storage because iOS
+// may drop notification.data and ignore openWindow URLs. Consume it once on
+// boot: only entries explicitly marked as clicked and fresh are honored.
+export async function consumePendingNotificationClick(): Promise<string | undefined> {
+  if (typeof caches === "undefined") return undefined
+  try {
+    const cache = await caches.open(PENDING_CACHE)
+    const response = await cache.match(PENDING_KEY)
+    if (!response) return undefined
+    await cache.delete(PENDING_KEY)
+    const payload = (await response.json()) as { url?: string; ts?: number; clicked?: boolean }
+    if (!payload || payload.clicked !== true || typeof payload.url !== "string") return undefined
+    if (!payload.ts || Date.now() - payload.ts > PENDING_FRESH_MS) return undefined
+    return payload.url
+  } catch {
+    return undefined
+  }
+}
+
+export async function clearPendingNotificationClick(): Promise<void> {
+  if (typeof caches === "undefined") return
+  try {
+    await (await caches.open(PENDING_CACHE)).delete(PENDING_KEY)
+  } catch {
+    undefined
+  }
+}

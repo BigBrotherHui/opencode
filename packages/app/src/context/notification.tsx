@@ -11,7 +11,7 @@ import { base64Encode } from "@opencode-ai/core/util/encode"
 import { decode64 } from "@/utils/base64"
 import { EventSessionError } from "@opencode-ai/sdk/v2"
 import { Persist, persisted } from "@/utils/persist"
-import { syncPushSubscription } from "@/utils/push"
+import { clearPendingNotificationClick, consumePendingNotificationClick, syncPushSubscription } from "@/utils/push"
 import { playSoundById } from "@/utils/sound"
 import { useGlobal } from "./global"
 import { ServerConnection, useServer } from "./server"
@@ -140,6 +140,22 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
     createEffect(() => {
       if (platform.platform === "desktop") return
       void syncPushSubscription(settings.notifications.agent())
+    })
+
+    createEffect(() => {
+      if (platform.platform === "desktop") return
+      if (!("serviceWorker" in navigator)) return
+      void consumePendingNotificationClick().then((url) => {
+        if (url) navigate(url)
+      })
+      const onMessage = (event: MessageEvent) => {
+        const data = event.data as { type?: string; url?: string } | undefined
+        if (!data || data.type !== "opencode:notification-click" || typeof data.url !== "string") return
+        void clearPendingNotificationClick()
+        navigate(data.url)
+      }
+      navigator.serviceWorker.addEventListener("message", onMessage)
+      onCleanup(() => navigator.serviceWorker.removeEventListener("message", onMessage))
     })
 
     const ensure = (key: ServerConnection.Key) => {

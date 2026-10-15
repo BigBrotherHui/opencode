@@ -14,6 +14,31 @@ const API_PREFIX = new Set([
 
 const SHELL_URLS = ["/", "/site.webmanifest", "/oc-theme-preload.js"]
 const HASHED_ASSET = /-[A-Za-z0-9_-]{6,}\.(?:js|css|woff2?|ttf|otf|png|svg|jpe?g|gif|webp|ico)$/i
+const PENDING_CACHE = "oc-pending"
+const PENDING_URL = "/__notification-click"
+
+// iOS drops notification.data and ignores openWindow URLs in some versions.
+// Keep the last push/click target in Cache Storage so the notification click
+// handler and the app on cold start can both recover the exact session URL.
+async function writePending(payload) {
+  try {
+    const cache = await caches.open(PENDING_CACHE)
+    await cache.put(PENDING_URL, new Response(JSON.stringify(payload), { headers: { "content-type": "application/json" } }))
+  } catch {
+    undefined
+  }
+}
+
+async function readPending() {
+  try {
+    const cache = await caches.open(PENDING_CACHE)
+    const response = await cache.match(PENDING_URL)
+    if (!response) return undefined
+    return await response.json()
+  } catch {
+    return undefined
+  }
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -31,7 +56,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith("oc-") && ![SHELL_CACHE, ASSET_CACHE, STATIC_CACHE].includes(key))
+            .filter((key) => key.startsWith("oc-") && ![SHELL_CACHE, ASSET_CACHE, STATIC_CACHE, PENDING_CACHE].includes(key))
             .map((key) => caches.delete(key)),
         ),
       )
@@ -97,29 +122,40 @@ self.addEventListener("push", (event) => {
   } catch {
     data = {}
   }
+  const url = data.url || "/"
   event.waitUntil(
-    self.registration.showNotification(data.title || "OpenCode", {
-      body: data.body || "",
-      icon: "/web-app-manifest-192x192.png",
-      badge: "/favicon-96x96-v3.png",
-      tag: data.tag,
-      data: { url: data.url || "/" },
-    }),
+    Promise.all([
+      writePending({ url, ts: Date.now(), clicked: false }),
+      self.registration.showNotification(data.title || "OpenCode", {
+        body: data.body || "",
+        icon: "/web-app-manifest-192x192.png",
+        badge: "/favicon-96x96-v3.png",
+        tag: data.tag,
+        data: { url },
+      }),
+    ]),
   )
 })
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close()
-  const url = (event.notification.data && event.notification.data.url) || "/"
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+    (async () => {
+      const direct = event.notification.data && event.notification.data.url
+      const pending = direct ? undefined : await readPending()
+      const url = direct || (pending && pending.url) || "/"
+      // Mark the click so a cold-started app can deep-link itself even when
+      // iOS ignored the URL above or dropped notification.data entirely.
+      await writePending({ url, ts: Date.now(), clicked: true })
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true })
       for (const client of clients) {
         if ("focus" in client) {
+          client.postMessage({ type: "opencode:notification-click", url })
           if ("navigate" in client) void client.navigate(url)
           return client.focus()
         }
       }
       return self.clients.openWindow(url)
-    }),
+    })(),
   )
 })
