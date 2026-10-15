@@ -154,11 +154,12 @@ self.addEventListener("push", (event) => {
 })
 
 self.addEventListener("notificationclick", (event) => {
-  event.notification.close()
+  event.waitUntil(debugBeacon({ stage: "sw-click-dispatched" }))
   event.waitUntil(
     (async () => {
       const direct = event.notification.data && event.notification.data.url
       event.waitUntil(debugBeacon({ stage: "sw-click-entry", url: direct, tag: event.notification.tag }))
+      event.notification.close()
       const pending = direct ? undefined : await readPending()
       const url = direct || (pending && pending.url) || "/"
       // Mark the click so a cold-started app can deep-link itself even when
@@ -186,6 +187,6 @@ self.addEventListener("notificationclick", (event) => {
         }
       }
       return self.clients.openWindow(url)
-    })(),
+    })().catch((error) => debugBeacon({ stage: "sw-click-error", message: String(error) })),
   )
 })
