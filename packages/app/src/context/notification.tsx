@@ -145,9 +145,20 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
     createEffect(() => {
       if (platform.platform === "desktop") return
       if (!("serviceWorker" in navigator)) return
+      // SPA navigation can silently no-op on some foreground transitions; verify
+      // the address after navigate() and fall back to a hard load of the deep
+      // link, which cold-boots the app straight into the target session.
+      const goto = (url: string, stage?: string) => {
+        if (stage) pushDebug(stage, url)
+        navigate(url)
+        window.setTimeout(() => {
+          pushDebug("app-location", window.location.pathname)
+          if (window.location.pathname !== url) window.location.assign(url)
+        }, 400)
+      }
       const consume = () => {
         void consumePendingNotificationClick().then((url) => {
-          if (url) navigate(url)
+          if (url) goto(url)
         })
       }
       consume()
@@ -155,8 +166,7 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
         const data = event.data as { type?: string; url?: string } | undefined
         if (!data || data.type !== "opencode:notification-click" || typeof data.url !== "string") return
         void clearPendingNotificationClick()
-        pushDebug("app-message", data.url)
-        navigate(data.url)
+        goto(data.url, "app-message")
       }
       // The service worker also broadcasts clicks on a channel (iOS often drops
       // postMessage), and we poll the pending entry while visible as a last
@@ -168,8 +178,7 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
           const data = event.data as { type?: string; url?: string } | undefined
           if (!data || data.type !== "opencode:notification-click" || typeof data.url !== "string") return
           void clearPendingNotificationClick()
-          pushDebug("app-broadcast", data.url)
-          navigate(data.url)
+          goto(data.url, "app-broadcast")
         }
       } catch {
         channel = undefined
