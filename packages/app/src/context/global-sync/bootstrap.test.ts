@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { createStore } from "solid-js/store"
 import { QueryClient } from "@tanstack/solid-query"
-import type { Config, OpencodeClient, Project } from "@opencode-ai/sdk/v2/client"
+import type { Config, OpencodeClient, Project, Session } from "@opencode-ai/sdk/v2/client"
+import { createServerSession } from "../server-session"
 import type { AgentApi, CatalogApi, CommandApi, ReferenceApi } from "@opencode-ai/client/promise"
 import type { NormalizedProviderListResponse } from "@opencode-ai/session-ui/context"
 import {
@@ -76,6 +77,49 @@ function directoryState() {
 }
 
 describe("bootstrapDirectory", () => {
+  test("clears missed busy status across Windows directory spellings without clearing another project", async () => {
+    const [store, setStore] = directoryState()
+    const session = createServerSession({} as OpencodeClient)
+    session.remember({ id: "finished", directory: "D:\\Project\\Dental" } as Session)
+    session.remember({ id: "other", directory: "D:\\Project\\Other" } as Session)
+    session.set("session_status", "finished", { type: "busy" })
+    session.set("session_status", "other", { type: "busy" })
+
+    await bootstrapDirectory({
+      directory: "D:/Project/Dental",
+      scope: ServerScope.local,
+      mcp: false,
+      global: {
+        config: {},
+        path: { ...store.path, directory: "D:/Project/Dental" },
+        project: [],
+        provider,
+      },
+      sdk: {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: {} }) },
+        session: { status: async () => ({ data: {} }) },
+        vcs: { get: async () => ({ data: undefined }) },
+        permission: { list: async () => ({ data: [] }) },
+        question: { list: async () => ({ data: [] }) },
+        v2: { reference: { list: async () => ({ data: { data: [] } }) } },
+      } as unknown as OpencodeClient,
+      api,
+      store,
+      setStore,
+      session,
+      vcsCache: { setStore() {} } as unknown as VcsCache,
+      loadSessions() {},
+      translate: (key) => key,
+      queryClient: new QueryClient(),
+      protocol: Promise.resolve("v1"),
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    expect(session.data.session_status.finished).toBeUndefined()
+    expect(session.data.session_status.other).toEqual({ type: "busy" })
+  })
+
   test("uses legacy MCP endpoints while refreshing a v1 directory", async () => {
     const legacyConfigReads: string[] = []
     const mcpReads: string[] = []

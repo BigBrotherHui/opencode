@@ -426,7 +426,8 @@ export async function bootstrapDirectory(input: {
               produce((draft) => {
                 for (const sessionID of Object.keys(draft)) {
                   if (statuses[sessionID]) continue
-                  if (input.session?.get(sessionID)?.directory === input.directory) delete draft[sessionID]
+                  if (directoryKey(input.session?.get(sessionID)?.directory ?? "") === directoryKey(input.directory))
+                    delete draft[sessionID]
                 }
               }),
             )
