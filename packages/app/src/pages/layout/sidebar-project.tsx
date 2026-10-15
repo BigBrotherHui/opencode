@@ -7,11 +7,15 @@ import { HoverCard } from "@opencode-ai/ui/hover-card"
 import { Icon } from "@opencode-ai/ui/icon"
 import { createSortable } from "@thisbeyond/solid-dnd"
 import { useLayout, type LocalProject } from "@/context/layout"
+import { usePlatform } from "@/context/platform"
+import { useServer } from "@/context/server"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { useNotification } from "@/context/notification"
+import { fileManagerApp } from "@/utils/file-manager"
+import { showToast } from "@/utils/toast"
 import { ProjectIcon, SessionItem, type SessionItemProps } from "./sidebar-items"
-import { displayName, sortedRootSessions } from "./helpers"
+import { displayName, errorMessage, sortedRootSessions } from "./helpers"
 
 export type ProjectSidebarContext = {
   currentDir: Accessor<string>
@@ -75,6 +79,12 @@ const ProjectTile = (props: {
 }): JSX.Element => {
   const notification = useNotification()
   const layout = useLayout()
+  const platform = usePlatform()
+  const server = useServer()
+  const canReveal = createMemo(() => platform.platform === "desktop" && !!platform.openPath && server.isLocal())
+  const revealLabel = createMemo(() =>
+    props.language.t(fileManagerApp(platform.platform === "desktop" ? (platform.os ?? "unknown") : "unknown").actionLabel),
+  )
   const unseenCount = createMemo(() =>
     props.dirs().reduce((total, directory) => total + notification.project.unseenCount(directory), 0),
   )
@@ -84,6 +94,16 @@ const ProjectTile = (props: {
       .dirs()
       .filter((directory) => notification.project.unseenCount(directory) > 0)
       .forEach((directory) => notification.project.markViewed(directory))
+
+  const reveal = () => {
+    if (!platform.openPath || !canReveal()) return
+    void platform.openPath(props.project.worktree).catch((cause: unknown) =>
+      showToast({
+        title: props.language.t("common.requestFailed"),
+        description: errorMessage(cause, props.language.t("common.requestFailed")),
+      }),
+    )
+  }
 
   return (
     <ContextMenu
@@ -154,6 +174,15 @@ const ProjectTile = (props: {
           <ContextMenu.Item onSelect={() => props.showEditProjectDialog(props.project)}>
             <ContextMenu.ItemLabel>{props.language.t("common.edit")}</ContextMenu.ItemLabel>
           </ContextMenu.Item>
+          <Show when={canReveal()}>
+            <ContextMenu.Item
+              data-action="project-reveal-menu"
+              data-project={base64Encode(props.project.worktree)}
+              onSelect={reveal}
+            >
+              <ContextMenu.ItemLabel>{revealLabel()}</ContextMenu.ItemLabel>
+            </ContextMenu.Item>
+          </Show>
           <ContextMenu.Item
             data-action="project-workspaces-toggle"
             data-project={base64Encode(props.project.worktree)}
