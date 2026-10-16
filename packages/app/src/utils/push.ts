@@ -80,7 +80,40 @@ function post(path: string, body: unknown) {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
+    keepalive: true,
   }).catch(() => undefined)
+}
+
+// Presence is scoped to this tab and push endpoint, never to the whole server.
+export function watchPushPresence() {
+  const id = crypto.randomUUID()
+  let endpoint: string | undefined
+  let disposed = false
+  let chain = Promise.resolve()
+  const report = (visible = document.visibilityState === "visible") => {
+    chain = chain.catch(() => undefined).then(async () => {
+      if (!endpoint && "serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration()
+        endpoint = (await registration?.pushManager?.getSubscription())?.endpoint
+      }
+      if (endpoint) await post("presence", { endpoint, id, visible: !disposed && visible })
+    })
+  }
+  const changed = () => report()
+  const hidden = () => report(false)
+  document.addEventListener("visibilitychange", changed)
+  window.addEventListener("pageshow", changed)
+  window.addEventListener("pagehide", hidden)
+  const timer = window.setInterval(changed, 15000)
+  report()
+  return () => {
+    disposed = true
+    window.clearInterval(timer)
+    document.removeEventListener("visibilitychange", changed)
+    window.removeEventListener("pageshow", changed)
+    window.removeEventListener("pagehide", hidden)
+    report(false)
+  }
 }
 
 const PENDING_CACHE = "oc-pending"

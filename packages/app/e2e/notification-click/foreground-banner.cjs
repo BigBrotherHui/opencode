@@ -41,6 +41,12 @@ async function run() {
       await open.click()
       await page.waitForURL((url) => url.pathname === href(target), { timeout: 15000 })
       console.log(`PASS ${name}: completion banner opens exact session using document navigation`)
+      await page.waitForTimeout(3000)
+      await page.evaluate(() => window.dispatchEvent(new Event("test-session-complete")))
+      await page.waitForTimeout(1500)
+      assert.equal(await page.getByRole("button", { name: /^(Open|打开)$/ }).count(), 0,
+        `${name}: the currently viewed session must not show a completion toast`)
+      console.log(`PASS ${name}: completion of the currently viewed session stays silent`)
     } finally {
       await browser.close()
     }

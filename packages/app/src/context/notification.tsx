@@ -12,7 +12,7 @@ import { decode64 } from "@/utils/base64"
 import { EventSessionError } from "@opencode-ai/sdk/v2"
 import { Persist, persisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
-import { clearPendingNotificationClick, consumePendingNotificationClick, pushDebug, syncPushSubscription } from "@/utils/push"
+import { clearPendingNotificationClick, consumePendingNotificationClick, pushDebug, syncPushSubscription, watchPushPresence } from "@/utils/push"
 import { playSoundById } from "@/utils/sound"
 import { useGlobal } from "./global"
 import { ServerConnection, useServer } from "./server"
@@ -137,6 +137,8 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
     })
     const activeDirectory = createMemo(() => decode64(params.dir))
     const activeSession = createMemo(() => params.id)
+
+    if (platform.platform === "web") onCleanup(watchPushPresence())
 
     createEffect(() => {
       if (platform.platform === "desktop") return
