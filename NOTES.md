@@ -251,6 +251,18 @@ rail 底部（栅格列之下）加 `arrow-down-to-line` 按钮，点击复用 `
 3. **人工触发 idle 的测试技巧**：`POST /session/{id}/abort` 对空闲会话也可用——cancel 无 runner 时仍会 `status.set(idle)` → publish `Event.Idle`，可零成本验证推送链路（日志出现 `push: turn complete`）。
 4. `/global/event` 实测事件样例：`data: {"directory":"D:\\PrivateProject\\opencode","project":"...","payload":{"id":"evt_...","type":"session.idle","properties":{"sessionID":"ses_..."}}}`。
 
+### 2026-10-16 — 通知策略：按"设备可见性"分流（前台静默/前台 toast/后台推送）
+
+**目标规则：** 完成会话正好是当前前台会话 → 什么都不弹；前台但在看别的会话 → 弹应用内提醒（点「打开」整页跳转到该会话）；设备在后台/锁屏 → 系统通知。
+
+**实现：**
+- 客户端 `utils/push.ts` 的 `watchPushPresence()`：按标签页 id + push endpoint 上报 `visible`（visibilitychange/pageshow/pagehide + 15s 心跳；`keepalive`），关闭时上报 false；仅 web 平台（desktop 跳过）。
+- 守护 `push-presence.js`：按 endpoint 维护可见标签页集合，45s 租约过期；`send()` 跳过仍有前台标签页的 endpoint（`push-daemon.js` 接线）；新增 `POST /pwa/push/presence`。
+- 应用内提醒沿用 `showToast` + `window.location.assign(会话深链)`，且重复投递（广播+消息）只处理一次。
+- 测试：`e2e/notification-click/foreground-banner.cjs`（Edge+WebKit：完成别的会话→提醒→点击跳到该会话；完成当前会话→静默）、`push-presence.test.js`（多标签页/后台/租约过期/校验）。
+
+**状态：** 已构建部署（手机 dist 重启 UI 进程加载新守护）；提交见 opencode `8a8ad0031f`、opencode-web `b407ea9`。
+
 ### 2026-10-16 — 推送点击只回首页：payload url 深链修复
 
 **现象：** 通知能收到，但点击只回到 opencode 首页，不跳会话。
