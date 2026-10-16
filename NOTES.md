@@ -263,6 +263,14 @@ rail 底部（栅格列之下）加 `arrow-down-to-line` 按钮，点击复用 `
 
 **状态：** 已构建部署（手机 dist 重启 UI 进程加载新守护）；提交见 opencode `8a8ad0031f`、opencode-web `b407ea9`。
 
+### 2026-10-16 — 推送扩展："卡住等你"通知 + 完成聚合
+
+**1. 权限/提问推送：** 守护监听 `permission.v2.asked` / `permission.asked` / `question.v2.asked` / `question.asked`（V1/V2 双份事件按 `properties.id` 30s 去重），推送「需要确认：/需要回答：<会话标题>」，**不滤子会话**（用户必须批准）；tag 按请求 id。事件字段：permission.v2.asked = `{id, sessionID, action, resources...}`，question.v2.asked = `{id, sessionID, questions}`。
+
+**2. 完成聚合：** `push-aggregate.js`（纯函数+单测）——120s 滑动窗口内的多个完成合并为一条**持续更新**的通知（同 tag 替换上一帧），正文 `N 个会话已完成：A、B`；窗口安静后开新 burst（新 tag）。单会话行为与之前一致。
+
+**验证：** 单测（聚合/滑动窗口/无标题回退）、presence 单测、真实事件日志（idle-burst tag + 手机 sw-push 回执）。提交 opencode-web `13b8708`。手机无需重载（纯守护侧）。
+
 ### 2026-10-16 — 推送点击只回首页：payload url 深链修复
 
 **现象：** 通知能收到，但点击只回到 opencode 首页，不跳会话。
