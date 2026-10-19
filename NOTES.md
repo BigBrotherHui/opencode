@@ -277,3 +277,36 @@ rail 底部（栅格列之下）加 `arrow-down-to-line` 按钮，点击复用 `
 **根因：** push-daemon.js 发送负载里 `url` 硬编码为 `'/'`。
 **修复：** url 改为会话深链 `/{base64UrlEncode(session.directory)}/session/{session.id}` —— base64 是 URL-safe 变体（`+→-`、`/→_`、去 `=`），与 `core/util/encode` 的 `base64Encode` 一致；SW 的 notificationclick（navigate/openWindow）无需改动。
 **验证：** 日志 `push: turn complete ... -> /RDpcUHJpdmF0ZVByb2plY3Rcb3BlbmNvZGU/session/ses_...`。
+
+### 2026-10-16 — 推理摘要开关改为按会话（全局设置保留为默认值）
+
+**需求：** 「显示推理摘要」原先只有设置里的全局开关，一开全开。改为按会话生效：会话头部新增 brain 图标按钮，只改当前会话；设置里的开关保留为全局默认。
+
+**实现（packages/app，未提交）：**
+- 按会话覆盖值存在 layout store 的 `sessionView[sessionKey].reasoningSummaries`（`context/layout.tsx` 的 `view()` 新增 get/set，与 `todoCollapsed`/`reviewMode` 同机制；sessionView 有 50 条 LRU 上限 `pruneSessionKeys`）。
+- 会话头 `SessionHeaderV2Actions`（`components/session/session-header.tsx`）新增按钮：`state=pressed` 显示有效值，点击写 `!effective`。
+- 时间线 `MessageTimeline`（`pages/session/timeline/message-timeline.tsx`）改用 `override ?? settings.general.showReasoningSummaries()`，projection 与 Thinking 行都走这个 memo。
+- 图标：`packages/ui/src/v2/components/icon.tsx` 新增 `brain`（从旧 icon 注册表拷贝，viewBox 0 0 20 20）。
+- i18n 复用现有 key `settings.general.row.reasoningSummaries.title`，未新增文案。
+
+**验证：** `bun typecheck` 通过（app/ui）；`bun run test:unit` 779/780，唯一失败是既有的 ar 语言包缺 provider.custom.edit.* 键（与本次无关）。未跑 e2e 性能基准（改动仅多一次 memo 读取）。
+
+**部署（已完成，2026-10-16 16:18）：** 手机 `build-opencode-ui.ps1` → 主包 `index-bVadecjq.js`（3000 已服务，页面刷新即生效，无需重启）。桌面：`bunx electron-vite build`（renderer main `main-D2wB9qpm.js`）→ 停 6 个 `OpenCode Dev` → `bunx electron-builder --win --dir --config electron-builder.config.ts`（asar 198,358,242 B，exe 16:17:59）→ 重启（6 进程）。验证：新旧 asar 对比 marker `"reasoningSummaries"`（旧无新有）+ v2 brain 字形；API :3910 / UI :3000 均 200。
+
+
+
+## 2026-10-17 晚 — 手机 UI 又变慢：中继排障 + SW 壳缓存
+
+**现象：** 手机进页面慢、进页面后加载慢。本机 API 均毫秒级（HTML 17ms、JS 822KB gz 73ms、provider 411KB gz 729ms），排除服务端。
+
+**排障结论（证据）：**
+- 	ailscale status 手机 relay=hkg、CurAddr 空、ping 0.7-4.7s；PC 自身 relay=sfo。两侧均无直连。
+- 手机端点只有 223.104.77.x / 223.104.68.155（移动蜂窝公网）+ 10.33.8.253（蜂窝私网），**没有 PC 所在的 192.168.1.x 网段** → 手机当前在蜂窝数据上，不在家里 Wi-Fi。
+- 手机在 19:27-19:29 曾用 [2409:895a:...]:41641 直连成功；20:03 手机重启 Tailscale（disco key 变）后再未直连。
+- 白天 14:26-17:33 直连走的是 111.55.210.69 / 27.38.202.127（那时的 Wi-Fi/蜂窝网络），说明直连依赖当时网络组合，现在这组打不通。
+- Clash Verge 曾把 tailscaled 的 STUN 送进代理（udp :3478 → 三毛机场），已修：Merge.yaml + 两份 profile merge + rHd9 rules + 三个 Script.js 均注入 PROCESS-NAME,tailscaled.exe,DIRECT；live rules 已确认 7 条 ProcessName。修后 PC STUN 端点恢复真实（113.92.74.94）。
+- 关闭 TUN 试验：直连仍未建立 → Clash 不是本次中继的主因，两侧 CGNAT/NAT 组合才是。
+
+**已部署代码改动：** packages/app/public/sw.js 导航策略由 network-first 改为 cache-first（缓存壳秒开，后台刷新）；dist/sw.js 已同步（无版本号 bump，靠 sw.js 本身 no-cache 更新，需手机重开 PWA 两次生效）。
+
+**待用户操作：** 手机连回与电脑同一 Wi-Fi（192.168.1.x），Tailscale 会走局域网直连；或路由器上给 UDP 41641 做端口映射。
