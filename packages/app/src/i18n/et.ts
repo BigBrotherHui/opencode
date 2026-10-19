@@ -744,6 +744,10 @@ export const dict = {
   "home.sessions.group.today": "Täna",
   "home.sessions.group.yesterday": "eile",
   "home.sessions.group.older": "Vanemad",
+  "home.sessions.archived": "Archived sessions",
+  "home.sessions.archived.empty": "No archived sessions",
+  "home.sessions.archived.restore": "Restore",
+
   "home.providerTip": "Ühendage 75+ teenusepakkujaga, et kasutada muid mudeleid, sealhulgas Claude, GPT, Gemini jne",
   "session.tab.session": "Seanss",
   "session.tab.review": "Ülevaade",

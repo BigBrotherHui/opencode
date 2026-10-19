@@ -646,6 +646,10 @@ export const dict = {
   "home.sessions.group.today": "Tänään",
   "home.sessions.group.yesterday": "Eilen",
   "home.sessions.group.older": "Vanhemmat",
+  "home.sessions.archived": "Archived sessions",
+  "home.sessions.archived.empty": "No archived sessions",
+  "home.sessions.archived.restore": "Restore",
+
   "home.providerTip": "Yhdistä yli 75 palveluntarjoajaan käyttääksesi muita malleja, kuten Claude, GPT, Gemini jne",
   "session.tab.session": "Istunto",
   "session.tab.review": "Tarkistus",

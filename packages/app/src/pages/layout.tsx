@@ -942,6 +942,14 @@ export default function LegacyLayout(props: ParentProps) {
     }
   }
 
+  // Archived sessions are absent from every live list, so the archive view reads them on
+  // demand instead of holding a second copy in the session store.
+  const openArchivedSessions = async () => {
+    const { DialogArchivedSessions } = await import("@/components/dialog-archived-sessions")
+    layout.mobileSidebar.hide()
+    dialog.show(() => <DialogArchivedSessions client={serverSDK().client} />)
+  }
+
   command.register("layout", () => {
     const commands: CommandOption[] = [
       {
@@ -1006,6 +1014,12 @@ export default function LegacyLayout(props: ParentProps) {
         category: language.t("command.category.settings"),
         keybind: "mod+comma",
         onSelect: () => openSettings(),
+      },
+      {
+        id: "session.archived.open",
+        title: language.t("home.sessions.archived"),
+        category: language.t("command.category.session"),
+        onSelect: () => void openArchivedSessions(),
       },
       {
         id: "session.previous",
@@ -2301,6 +2315,8 @@ export default function LegacyLayout(props: ParentProps) {
       settingsLabel={() => language.t("sidebar.settings")}
       settingsKeybind={() => command.keybind("settings.open")}
       onOpenSettings={openSettings}
+      archivedSessionsLabel={() => language.t("home.sessions.archived")}
+      onOpenArchivedSessions={openArchivedSessions}
       helpLabel={() => language.t("sidebar.help")}
       onOpenHelp={() => platform.openExternal("https://opencode.ai/desktop-feedback")}
       renderPanel={() =>

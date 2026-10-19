@@ -197,7 +197,8 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
           permission: Permission.merge(current.permission ?? [], ctx.payload.permission),
         })
       }
-      if (ctx.payload.time?.archived !== undefined) {
+      // An explicit `null` is a request to un-archive, so the null check stays separate from `undefined`.
+      if (ctx.payload.time !== undefined && "archived" in ctx.payload.time) {
         yield* session.setArchived({ sessionID: ctx.params.sessionID, time: ctx.payload.time.archived })
       }
       return yield* requireSession(ctx.params.sessionID)

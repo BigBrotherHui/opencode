@@ -753,6 +753,10 @@ export const dict = {
   "home.sessions.group.today": "Днес",
   "home.sessions.group.yesterday": "Вчера",
   "home.sessions.group.older": "По-стари",
+  "home.sessions.archived": "Archived sessions",
+  "home.sessions.archived.empty": "No archived sessions",
+  "home.sessions.archived.restore": "Restore",
+
   "home.providerTip":
     "Свържете се с над 75 доставчици, за да използвате други модели, включително Claude, GPT, Gemini и т.н.",
   "session.tab.session": "Сесия",

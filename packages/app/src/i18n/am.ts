@@ -736,6 +736,10 @@ export const dict = {
   "home.sessions.group.today": "ዛሬ",
   "home.sessions.group.yesterday": "ትላንት",
   "home.sessions.group.older": "የቆየ",
+  "home.sessions.archived": "Archived sessions",
+  "home.sessions.archived.empty": "No archived sessions",
+  "home.sessions.archived.restore": "Restore",
+
   "home.providerTip": "Claude፣ GPT፣ Gemini፣ ወዘተ] ጨምሮ ሌሎች ሞዴሎችን ለመጠቀም ከ75+ አቅራቢዎች ጋር ይገናኙ",
   "session.tab.session": "ክፍለ ጊዜ",
   "session.tab.review": "ግምገማ",

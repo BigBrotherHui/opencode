@@ -749,6 +749,10 @@ export const dict = {
   "home.sessions.group.today": "Danes",
   "home.sessions.group.yesterday": "včeraj",
   "home.sessions.group.older": "Starejši",
+  "home.sessions.archived": "Archived sessions",
+  "home.sessions.archived.empty": "No archived sessions",
+  "home.sessions.archived.restore": "Restore",
+
   "home.providerTip": "Povežite se s 75+ ponudniki za uporabo drugih modelov, vključno z Claude, GPT, Gemini itd.",
   "session.tab.session": "Seja",
   "session.tab.review": "Pregled",

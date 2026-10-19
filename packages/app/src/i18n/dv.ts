@@ -759,6 +759,10 @@ export const dict = {
   "home.sessions.group.today": "މިއަދު",
   "home.sessions.group.yesterday": "އިއްޔެ",
   "home.sessions.group.older": "އުމުރުން ދުވަސްވީއެވެ",
+  "home.sessions.archived": "Archived sessions",
+  "home.sessions.archived.empty": "No archived sessions",
+  "home.sessions.archived.restore": "Restore",
+
   "home.providerTip":
     "75+ ޕްރޮވައިޑަރުންނާ ގުޅިގެން އެހެން މޮޑެލްތައް ބޭނުންކުރުން، އޭގެ ތެރޭގައި Claude، GPT، Gemini ފަދަ މޮޑެލްތައް ހިމެނެއެވެ",
   "session.tab.session": "ސެޝަން",

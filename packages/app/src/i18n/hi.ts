@@ -758,6 +758,10 @@ export const dict = {
   "home.sessions.group.today": "आज",
   "home.sessions.group.yesterday": "कल",
   "home.sessions.group.older": "पुराने",
+  "home.sessions.archived": "Archived sessions",
+  "home.sessions.archived.empty": "No archived sessions",
+  "home.sessions.archived.restore": "Restore",
+
   "home.providerTip": "Claude, GPT, Gemini आदि सहित अन्य मॉडल का उपयोग करने के लिए 75+ प्रोवाइडर से कनेक्ट करें",
   "session.tab.session": "सेशन",
   "session.tab.review": "समीक्षा",

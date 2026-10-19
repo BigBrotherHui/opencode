@@ -751,6 +751,10 @@ export const dict = {
   "home.sessions.group.today": "Í dag",
   "home.sessions.group.yesterday": "Í gær",
   "home.sessions.group.older": "Eldri",
+  "home.sessions.archived": "Archived sessions",
+  "home.sessions.archived.empty": "No archived sessions",
+  "home.sessions.archived.restore": "Restore",
+
   "home.providerTip": "Tengstu við 75+ veitendur til að nota aðrar gerðir, þar á meðal Claude, GPT, Gemini, osfrv",
   "session.tab.session": "Lota",
   "session.tab.review": "Upprifjun",

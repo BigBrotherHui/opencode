@@ -782,6 +782,10 @@ export const dict = {
   "home.sessions.group.today": "今天",
   "home.sessions.group.yesterday": "昨天",
   "home.sessions.group.older": "更早",
+  "home.sessions.archived": "封存工作階段",
+  "home.sessions.archived.empty": "沒有已封存的工作階段",
+  "home.sessions.archived.restore": "還原",
+
   "home.providerTip": "連線 75 個以上的提供者，使用 Claude、GPT、Gemini 等其他模型",
 
   "session.tab.session": "工作階段",

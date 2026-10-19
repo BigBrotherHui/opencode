@@ -28,6 +28,8 @@ export const SidebarContent = (props: {
   settingsLabel: Accessor<string>
   settingsKeybind: Accessor<string | undefined>
   onOpenSettings: () => void
+  archivedSessionsLabel: Accessor<string>
+  onOpenArchivedSessions: () => void
   helpLabel: Accessor<string>
   onOpenHelp: () => void
   renderPanel: () => JSX.Element
@@ -90,6 +92,16 @@ export const SidebarContent = (props: {
           </DragDropProvider>
         </div>
         <div class="shrink-0 w-full pt-3 pb-6 flex flex-col items-center gap-2">
+          <Tooltip placement={placement()} value={props.archivedSessionsLabel()}>
+            <IconButton
+              icon="archive"
+              variant="ghost"
+              size="large"
+              data-action="sidebar-archived-sessions"
+              onClick={props.onOpenArchivedSessions}
+              aria-label={props.archivedSessionsLabel()}
+            />
+          </Tooltip>
           <TooltipKeybind placement={placement()} title={props.settingsLabel()} keybind={props.settingsKeybind() ?? ""}>
             <IconButton
               icon="settings-gear"

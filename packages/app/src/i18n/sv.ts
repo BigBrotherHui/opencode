@@ -753,6 +753,10 @@ export const dict = {
   "home.sessions.group.today": "I dag",
   "home.sessions.group.yesterday": "I går",
   "home.sessions.group.older": "Äldre",
+  "home.sessions.archived": "Archived sessions",
+  "home.sessions.archived.empty": "No archived sessions",
+  "home.sessions.archived.restore": "Restore",
+
   "home.providerTip": "Anslut till 75+ leverantörer för att använda andra modeller, inklusive Claude, GPT, Gemini, etc",
   "session.tab.session": "Session",
   "session.tab.review": "Granskning",

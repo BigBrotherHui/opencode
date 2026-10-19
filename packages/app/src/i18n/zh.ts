@@ -793,6 +793,10 @@ export const dict = {
   "home.sessions.group.today": "今天",
   "home.sessions.group.yesterday": "昨天",
   "home.sessions.group.older": "更早",
+  "home.sessions.archived": "归档会话",
+  "home.sessions.archived.empty": "没有已归档的会话",
+  "home.sessions.archived.restore": "恢复",
+
   "home.providerTip": "连接 75 个以上的提供商，使用包括 Claude、GPT、Gemini 在内的更多模型",
 
   "session.tab.session": "会话",

@@ -69,8 +69,9 @@ function sessionRow(info: SessionV1.SessionInfo): typeof SessionTable.$inferInse
     permission: info.permission ? [...info.permission] : undefined,
     time_created: info.time.created,
     time_updated: info.time.updated,
-    time_compacting: info.time.compacting,
-    time_archived: info.time.archived,
+    time_compacting: info.time.compacting ?? null,
+    // `undefined` is dropped from an UPDATE's SET clause, so clearing an archive needs an explicit null.
+    time_archived: info.time.archived ?? null,
   }
 }
 
