@@ -74,6 +74,7 @@ type SessionView = {
   pendingMessage?: string
   pendingMessageAt?: number
   todoCollapsed?: boolean
+  reasoningSummaries?: boolean
 }
 
 type TabHandoff = {
@@ -886,6 +887,21 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
               } else {
                 setStore("sessionView", session, "todoCollapsed", collapsed)
               }
+            },
+          },
+          reasoningSummaries: {
+            get: () => s().reasoningSummaries,
+            set(next: boolean) {
+              const session = key()
+              const current = store.sessionView[session]
+              if (!current) {
+                setStore("sessionView", session, { scroll: {}, reasoningSummaries: next })
+                prune(session)
+                return
+              }
+              if (current.reasoningSummaries === next) return
+              setStore("sessionView", session, "reasoningSummaries", next)
+              prune(session)
             },
           },
           terminal: {

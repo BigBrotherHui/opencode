@@ -234,6 +234,9 @@ export function SessionHeader() {
   const tint = createMemo(() =>
     messageAgentColor(params.id ? sync().data.message[params.id] : undefined, sync().data.agent),
   )
+  const showReasoningSummaries = createMemo(
+    () => view().reasoningSummaries.get() ?? settings.general.showReasoningSummaries(),
+  )
   const v2ActionsState = createMemo<SessionHeaderV2ActionsState>(() => ({
     statusVisible: status(),
     statusLabel: language.t("status.popover.trigger"),
@@ -242,6 +245,8 @@ export function SessionHeader() {
     reviewVisible: isDesktop(),
     reviewOpened: view().reviewPanel.opened(),
     onReviewToggle: () => view().reviewPanel.toggle(),
+    reasoningSummaries: showReasoningSummaries(),
+    onReasoningSummariesToggle: () => view().reasoningSummaries.set(!showReasoningSummaries()),
   }))
 
   const selectApp = (app: OpenApp) => {
@@ -524,6 +529,8 @@ type SessionHeaderV2ActionsState = {
   reviewVisible: boolean
   reviewOpened: boolean
   onReviewToggle: () => void
+  reasoningSummaries: boolean
+  onReasoningSummariesToggle: () => void
 }
 
 function SessionHeaderV2Actions(props: { state: SessionHeaderV2ActionsState }) {
@@ -531,6 +538,23 @@ function SessionHeaderV2Actions(props: { state: SessionHeaderV2ActionsState }) {
 
   return (
     <div class="flex items-center gap-2">
+      <TooltipV2
+        class="shrink-0"
+        placement="bottom"
+        value={language.t("settings.general.row.reasoningSummaries.title")}
+      >
+        <IconButtonV2
+          type="button"
+          variant="ghost-muted"
+          size="large"
+          class="!w-9 shrink-0"
+          state={props.state.reasoningSummaries ? "pressed" : undefined}
+          onClick={props.state.onReasoningSummariesToggle}
+          aria-label={language.t("settings.general.row.reasoningSummaries.title")}
+          aria-pressed={props.state.reasoningSummaries}
+          icon={<IconV2 name="brain" />}
+        />
+      </TooltipV2>
       <Show when={props.state.statusVisible}>
         <Tooltip placement="bottom" value={props.state.statusLabel}>
           <StatusPopoverV2 />
