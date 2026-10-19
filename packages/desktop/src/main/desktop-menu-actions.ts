@@ -1,6 +1,6 @@
 import { BrowserWindow } from "electron"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
-import { createMainWindow, updateTitlebar } from "./windows"
+import { createMainWindow, closeWindow, updateTitlebar } from "./windows"
 
 export type DesktopMenuActionHandlers = Partial<{
   checkForUpdates: () => void
@@ -23,7 +23,7 @@ export function runDesktopMenuAction(
       createMainWindow()
       return
     case "window.close":
-      win?.close()
+      if (win) closeWindow(win)
       return
     case "window.minimize":
       win?.minimize()

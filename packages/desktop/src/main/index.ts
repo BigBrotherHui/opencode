@@ -36,12 +36,14 @@ import { safeWebContentsURL } from "./window-state"
 import {
   getLastFocusedWindow,
   registerRendererProtocol,
+  revealMainWindows,
   setRelaunchHandler,
   setAppQuitting,
   setBackgroundColor,
   setDockIcon,
   restoreMainWindows,
 } from "./windows"
+import { refreshTray } from "./tray"
 import { createWslServersController } from "./wsl/servers"
 import { registerWslIpcHandlers } from "./wsl/ipc"
 import { spawnWslSidecar } from "./wsl/sidecar"
@@ -208,11 +210,7 @@ const main = Effect.gen(function* () {
       logger.log("deep link received via second-instance", { urls })
       emitDeepLinks(urls)
     }
-    const win = getLastFocusedWindow()
-    if (win) {
-      win.show()
-      win.focus()
-    }
+    revealMainWindows()
   })
 
   app.on("open-url", (event: Event, url: string) => {
@@ -308,7 +306,9 @@ const main = Effect.gen(function* () {
     exportDebugLogs: () => exportDebugLogs(),
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
     setNativeTranslations: (bundle) => {
-      if (setNativeTranslations(bundle)) createMenu(menuDeps)
+      if (!setNativeTranslations(bundle)) return
+      createMenu(menuDeps)
+      refreshTray()
     },
   })
   registerWslIpcHandlers(wslServers)

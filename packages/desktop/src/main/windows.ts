@@ -13,6 +13,7 @@ import { getStore, removeStoreFile } from "./store"
 import { PINCH_ZOOM_ENABLED_KEY, WINDOW_IDS_KEY } from "./store-keys"
 import { createUnresponsiveSampler } from "./unresponsive"
 import { nativeT } from "./native-translations"
+import { ensureTray } from "./tray"
 import { createWindowRegistry } from "./window-registry"
 import { safeWindowURL } from "./window-state"
 import { resolveExternalURL, resolveLocalFilePath } from "./external-url"
@@ -53,6 +54,11 @@ let relaunchHandler = () => {
 const titlebarThemes = new WeakMap<BrowserWindow, Partial<TitlebarTheme>>()
 const pinchZoomEnabled = new WeakMap<BrowserWindow, boolean>()
 const windowIDs = new WeakMap<BrowserWindow, string>()
+// Windows closes a window when the caption X is clicked; the desktop app hides
+// it into the notification area instead so the sidecar and its sessions stay
+// alive. Closing for real has to go through closeWindow() (menu, updater,
+// app.quit()).
+const forcedClose = new WeakSet<BrowserWindow>()
 const registry = createWindowRegistry<BrowserWindow>({
   read: () => getStore().get(WINDOW_IDS_KEY),
   write: (ids) => getStore().set(WINDOW_IDS_KEY, ids),
@@ -71,6 +77,43 @@ export function setRelaunchHandler(handler: () => void) {
 
 export function setAppQuitting(quitting = true) {
   registry.setQuitting(quitting)
+}
+
+export function closeWindow(win: BrowserWindow) {
+  if (win.isDestroyed()) return
+  forcedClose.add(win)
+  win.close()
+  // A renderer beforeunload handler can still cancel the close; drop the flag
+  // so the next caption X hides the window again instead of closing it.
+  forcedClose.delete(win)
+}
+
+// Hiding rather than minimizing keeps the window out of the taskbar, so the
+// tray icon is the only affordance left to bring it back. If the tray cannot be
+// created, fall back to minimizing so the window stays reachable.
+function hideWindow(win: BrowserWindow) {
+  if (!ensureTray({ reveal: revealMainWindows, newWindow: () => createMainWindow() })) {
+    win.minimize()
+    return
+  }
+  win.hide()
+}
+
+// Tray click and the tray menu's app item both land here. With one window that
+// is just that window; with several, every hidden window comes back and the
+// last focused one takes focus.
+export function revealMainWindows() {
+  const windows = BrowserWindow.getAllWindows().filter((win) => !win.isDestroyed())
+  if (windows.length === 0) {
+    restoreMainWindows()
+    return
+  }
+  for (const win of windows) {
+    if (win.isMinimized()) win.restore()
+    win.show()
+  }
+  const target = getLastFocusedWindow() ?? windows[0]
+  target.focus()
 }
 
 export function setBackgroundColor(color: string) {
@@ -272,10 +315,18 @@ function registerWindow(win: BrowserWindow, id: string) {
   registry.register(id, win)
 
   win.on("focus", () => registry.focused(id))
+  win.on("close", (event) => {
+    if (process.platform !== "win32" || forcedClose.has(win) || registry.isQuitting()) return
+    event.preventDefault()
+    hideWindow(win)
+  })
   // Windows never emits before-quit on OS shutdown/logoff, but each window
   // gets session-end before it closes; flag the quit so ids stay persisted.
   win.on("session-end", () => registry.setQuitting())
-  win.on("closed", () => registry.closed(id))
+  win.on("closed", () => {
+    forcedClose.delete(win)
+    registry.closed(id)
+  })
 }
 
 function windowStateFile(id: string) {
