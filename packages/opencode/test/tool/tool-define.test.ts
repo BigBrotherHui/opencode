@@ -151,4 +151,82 @@ describe("Tool.define", () => {
       expect(args.message).toContain(`["questions"][0]["question"]`)
     }),
   )
+
+  // Some models wrap the whole argument object one level too deep, e.g.
+  // `{"arguments": {"command": "ls"}}`. Without unwrapping, a perfectly good
+  // call is rejected with a misleading `Missing key at ["command"]`.
+  const commandParams = Schema.Struct({
+    command: Schema.String,
+    workdir: Schema.optional(Schema.String),
+  })
+
+  function makeCommandTool(id: string, calls: unknown[]) {
+    return Tool.define(
+      id,
+      Effect.succeed({
+        description: "run a command",
+        parameters: commandParams,
+        execute(args: { command: string; workdir?: string }) {
+          calls.push(args)
+          return Effect.succeed({ title: "ok", output: "ok", metadata: { truncated: false } })
+        },
+      }),
+    )
+  }
+
+  it.effect("unwraps a single `arguments` object envelope", () =>
+    Effect.gen(function* () {
+      const calls: unknown[] = []
+      const info = yield* makeCommandTool("cmd-object", calls)
+      const tool = yield* info.init()
+      const execute = tool.execute as unknown as (args: unknown, ctx: Tool.Context) => ReturnType<typeof tool.execute>
+
+      yield* execute({ arguments: { command: "echo hi", workdir: "/tmp" } }, makeCtx())
+
+      expect(calls).toEqual([{ command: "echo hi", workdir: "/tmp" }])
+    }),
+  )
+
+  it.effect("unwraps an `arguments` envelope holding a JSON string", () =>
+    Effect.gen(function* () {
+      const calls: unknown[] = []
+      const info = yield* makeCommandTool("cmd-string", calls)
+      const tool = yield* info.init()
+      const execute = tool.execute as unknown as (args: unknown, ctx: Tool.Context) => ReturnType<typeof tool.execute>
+
+      yield* execute({ arguments: '{"command":"echo hi"}' }, makeCtx())
+
+      expect(calls).toEqual([{ command: "echo hi" }])
+    }),
+  )
+
+  it.effect("leaves a freeform { input: string } payload untouched", () =>
+    Effect.gen(function* () {
+      const calls: unknown[] = []
+      const info = yield* makeCommandTool("cmd-freeform", calls)
+      const tool = yield* info.init()
+      const execute = tool.execute as unknown as (args: unknown, ctx: Tool.Context) => ReturnType<typeof tool.execute>
+
+      // Not JSON, so it is not an envelope: must still fail instead of silently
+      // becoming `{ command: "..." }` for a tool that takes freeform input.
+      const exit = yield* execute({ input: "echo hi" }, makeCtx()).pipe(Effect.exit)
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(calls).toEqual([])
+    }),
+  )
+
+  it.effect("does not unwrap when the envelope carries extra keys", () =>
+    Effect.gen(function* () {
+      const calls: unknown[] = []
+      const info = yield* makeCommandTool("cmd-extra", calls)
+      const tool = yield* info.init()
+      const execute = tool.execute as unknown as (args: unknown, ctx: Tool.Context) => ReturnType<typeof tool.execute>
+
+      const exit = yield* execute({ arguments: { command: "echo hi" }, extra: 1 }, makeCtx()).pipe(Effect.exit)
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(calls).toEqual([])
+    }),
+  )
 })
