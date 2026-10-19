@@ -659,6 +659,8 @@ export default function LegacyLayout(props: ParentProps) {
   const prefetchChunk = 20
   const prefetchConcurrency = 2
   const prefetchPendingLimit = 10
+  // A direct link answers in tens of milliseconds; a relayed phone link takes hundreds.
+  const slowLinkRoundTripMs = 150
   const span = 4
   const prefetchToken = { value: 0 }
   const prefetchQueues = new Map<string, PrefetchQueue>()
@@ -788,8 +790,30 @@ export default function LegacyLayout(props: ParentProps) {
     pumpPrefetch(directory)
   }
 
+  // Warming neighbours exists to hide latency, which a relayed phone link can only
+  // afford in small doses: there each round trip costs hundreds of milliseconds and the
+  // warmed sessions compete with the one on screen for the same bandwidth. Probe the
+  // link once per server: a fast link warms the whole span, a relayed one warms the
+  // single neighbour on each side that session switching actually needs. The probe
+  // starts out as slow so nothing is warmed before the answer arrives.
+  const [link, setLink] = createStore({ slow: true, measured: "" })
+  createEffect(() => {
+    const url = serverSDK().url
+    if (link.measured === url) return
+    setLink("measured", url)
+    const started = performance.now()
+    void serverSDK()
+      .client.global.health()
+      .catch(() => undefined)
+      .then(() => {
+        if (link.measured !== url) return
+        setLink("slow", performance.now() - started >= slowLinkRoundTripMs)
+      })
+  })
+
   const warm = (sessions: Session[], index: number) => {
-    for (let offset = 1; offset <= span; offset++) {
+    const reach = link.slow ? 1 : span
+    for (let offset = 1; offset <= reach; offset++) {
       const next = sessions[index + offset]
       if (next) prefetchSession(next, offset === 1 ? "high" : "low")
 
@@ -810,6 +834,7 @@ export default function LegacyLayout(props: ParentProps) {
       if (first) prefetchSession(first, "high")
     }
 
+    // warm() reads the probe result, so this effect also re-runs when it resolves.
     warm(sessions, index)
   })
 

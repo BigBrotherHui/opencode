@@ -39,6 +39,8 @@ import {
   normalizeProviderList,
 } from "./utils"
 import { formatServerError } from "@/utils/server-errors"
+import { once } from "./inflight"
+import { freshProviderSnapshot, readProviderSnapshot, writeProviderSnapshot, type ProviderSnapshot } from "./provider-snapshot"
 import { QueryClient, queryOptions } from "@tanstack/solid-query"
 import { loadMcpQuery, loadMcpResourcesQuery } from "../server-sync"
 import { NormalizedProviderListResponse } from "@opencode-ai/session-ui/context"
@@ -226,6 +228,11 @@ function warmSessions(input: {
 // dropped as soon as it settles so a later invalidation still re-fetches.
 const providerRequests = new Map<string, Promise<NormalizedProviderListResponse>>()
 
+function snapshotValue(snapshot: ProviderSnapshot): NormalizedProviderListResponse {
+  if (snapshot.protocol === "v1") return normalizeProviderList(snapshot.payload)
+  return normalizeProviderList(snapshot.providers, snapshot.models, snapshot.defaultModel)
+}
+
 export const loadProvidersQuery = (
   scope: ServerScope,
   directory: string | null,
@@ -245,9 +252,16 @@ export const loadProvidersQuery = (
       const inflight = providerRequests.get(key)
       if (inflight) return inflight
       const request = retry(async () => {
+        // A snapshot spares the transfer and the parse when the app is reopened on a
+        // slow link. Refresh paths drop it first, so a changed catalog is never stale here.
+        const snapshot = await readProviderSnapshot(key)
+        if (snapshot && freshProviderSnapshot(snapshot.savedAt, Date.now())) return snapshotValue(snapshot)
+
         if ((await protocol) === "v1" && legacy) {
           const result = await legacy.provider.list()
-          return normalizeProviderList(result.data!)
+          const fetched: ProviderSnapshot = { protocol: "v1", payload: result.data! }
+          void writeProviderSnapshot(key, fetched)
+          return snapshotValue(fetched)
         }
         const location = directory ? { location: { directory } } : undefined
         const [providers, models, defaultModel] = await Promise.all([
@@ -255,7 +269,14 @@ export const loadProvidersQuery = (
           sdk.model.list(location),
           sdk.model.default(location),
         ])
-        return normalizeProviderList(providers.data, models.data, defaultModel.data)
+        const fetched: ProviderSnapshot = {
+          protocol: "v2",
+          providers: providers.data,
+          models: models.data,
+          defaultModel: defaultModel.data,
+        }
+        void writeProviderSnapshot(key, fetched)
+        return snapshotValue(fetched)
       }).finally(() => providerRequests.delete(key))
       providerRequests.set(key, request)
       return request
@@ -293,10 +314,12 @@ export const loadAgentsQuery = (
   queryOptions({
     queryKey: [...scopedKey(scope, directory), "agents"],
     queryFn: () =>
-      retry(async () => {
-        if ((await protocol) === "v1" && legacy) return normalizeAgentList((await legacy.app.agents()).data ?? [])
-        return sdk.list({ location: { directory } }).then((result) => normalizeAgentList(result.data))
-      }),
+      once(`agents:${directoryKey(directory)}`, () =>
+        retry(async () => {
+          if ((await protocol) === "v1" && legacy) return normalizeAgentList((await legacy.app.agents()).data ?? [])
+          return sdk.list({ location: { directory } }).then((result) => normalizeAgentList(result.data))
+        }),
+      ),
   })
 
 export const loadCommands = (
@@ -305,23 +328,25 @@ export const loadCommands = (
   legacy?: OpencodeClient,
   protocol?: Promise<ServerProtocol>,
 ): Promise<CommandInfo[]> =>
-  retry(async () => {
-    if ((await protocol) === "v1" && legacy) {
-      return ((await legacy.command.list()).data ?? []).map((command) => {
-        const [providerID, id] = command.model?.split("/") ?? []
-        return {
-          name: command.name,
-          template: command.template,
-          description: command.description,
-          agent: command.agent,
-          model: providerID && id ? { providerID, id } : undefined,
-          subtask: command.subtask,
-          // source: command.source === "skill" ? undefined : command.source,
-        }
-      })
-    }
-    return api.list({ location: { directory } }).then((result) => result.data)
-  })
+  once(`commands:${directoryKey(directory)}`, () =>
+    retry(async () => {
+      if ((await protocol) === "v1" && legacy) {
+        return ((await legacy.command.list()).data ?? []).map((command) => {
+          const [providerID, id] = command.model?.split("/") ?? []
+          return {
+            name: command.name,
+            template: command.template,
+            description: command.description,
+            agent: command.agent,
+            model: providerID && id ? { providerID, id } : undefined,
+            subtask: command.subtask,
+            // source: command.source === "skill" ? undefined : command.source,
+          }
+        })
+      }
+      return api.list({ location: { directory } }).then((result) => result.data)
+    }),
+  )
 
 export const loadPathQuery = (
   scope: ServerScope,

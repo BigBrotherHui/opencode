@@ -28,6 +28,7 @@ import {
 import { createChildStoreManager } from "./global-sync/child-store"
 import { applyDirectoryEvent, applyGlobalEvent } from "./global-sync/event-reducer"
 import { estimateRootSessionTotal, loadRootSessions, loadRootSessionsV1 } from "./global-sync/session-load"
+import { once } from "./global-sync/inflight"
 import { trimSessions } from "./global-sync/session-trim"
 import type { ProjectMeta } from "./global-sync/types"
 import { SESSION_RECENT_LIMIT } from "./global-sync/types"
@@ -50,6 +51,7 @@ import { createSharedProjects, mergeProjects, sameProjects, SHARED_PROJECTS_SCOP
 import { createDebouncedPush } from "./global-sync/shared-projects-push"
 import { createSharedPins, mergePins, samePins, SHARED_PINS_SCOPE } from "./global-sync/shared-pins"
 import { Persist, persisted } from "@/utils/persist"
+import { clearProviderSnapshots } from "./global-sync/provider-snapshot"
 import type { ServerApi } from "@/utils/server"
 import type {
   McpListInput,
@@ -107,12 +109,13 @@ export const loadMcpQuery = (
     readonly [ServerScope, string, "mcp"]
   >({
     queryKey: [scope, directory, "mcp"] as const,
-    queryFn: async () => {
-      if ((await protocol) === "v1" && legacy) return (await legacy.mcp.status()).data ?? {}
-      return api
-        .list({ location: { directory } })
-        .then((result) => Object.fromEntries(result.data.map((server) => [server.name, server.status])))
-    },
+    queryFn: () =>
+      once(`mcp:${directoryKey(directory)}`, async () => {
+        if ((await protocol) === "v1" && legacy) return (await legacy.mcp.status()).data ?? {}
+        return api
+          .list({ location: { directory } })
+          .then((result) => Object.fromEntries(result.data.map((server) => [server.name, server.status])))
+      }),
   })
 
 export const loadMcpResourcesQuery = (
@@ -129,21 +132,22 @@ export const loadMcpResourcesQuery = (
     readonly [ServerScope, string, "mcpResources"]
   >({
     queryKey: [scope, directory, "mcpResources"] as const,
-    queryFn: async () => {
-      if ((await protocol) === "v1" && legacy) {
-        return Object.fromEntries(
-          Object.entries((await legacy.experimental.resource.list()).data ?? {}).map(([key, resource]) => [
-            key,
-            { ...resource, server: resource.client },
-          ]),
-        )
-      }
-      return api.resource
-        .catalog({ location: { directory } })
-        .then((result) =>
-          Object.fromEntries(result.data.resources.map((resource) => [`${resource.server}:${resource.uri}`, resource])),
-        )
-    },
+    queryFn: () =>
+      once(`mcpResources:${directoryKey(directory)}`, async () => {
+        if ((await protocol) === "v1" && legacy) {
+          return Object.fromEntries(
+            Object.entries((await legacy.experimental.resource.list()).data ?? {}).map(([key, resource]) => [
+              key,
+              { ...resource, server: resource.client },
+            ]),
+          )
+        }
+        return api.resource
+          .catalog({ location: { directory } })
+          .then((result) =>
+            Object.fromEntries(result.data.resources.map((resource) => [`${resource.server}:${resource.uri}`, resource])),
+          )
+      }),
     placeholderData: {},
   })
 
@@ -299,10 +303,14 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
 
   const queryClient = useQueryClient()
   const homeSessions = createHomeSessionIndexCache(queryClient, ServerConnection.key(serverSDK.server))
-  const refreshProviders = () =>
-    queryClient.refetchQueries({
+  const refreshProviders = () => {
+    // Drop the on-disk catalog first: a snapshot is what lets a reopen skip the
+    // request, so a refresh has to make sure the next query cannot use it.
+    void clearProviderSnapshots()
+    return queryClient.refetchQueries({
       predicate: (query) => query.queryKey[0] === serverSDK.scope && query.queryKey[2] === "providers",
     })
+  }
 
   let bootedAt = 0
   let bootingRoot = false
@@ -580,6 +588,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
       ) {
         // The provider catalog is cached for a fresh window, so an explicit
         // invalidation is what makes a config change from another client show up.
+        void clearProviderSnapshots()
         void queryClient.invalidateQueries({
           predicate: (query) => query.queryKey[0] === serverSDK.scope && query.queryKey[2] === "providers",
         })
@@ -686,6 +695,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
       bootstrap.refetch()
       // Invalidate all provider queries so newly configured custom providers
       // appear immediately in the available provider list across all directories.
+      void clearProviderSnapshots()
       queryClient.invalidateQueries({ queryKey: [serverSDK.scope, null, "providers"] })
       queryClient.invalidateQueries({
         predicate: (query) => query.queryKey[0] === serverSDK.scope && query.queryKey[2] === "providers",

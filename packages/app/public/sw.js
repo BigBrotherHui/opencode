@@ -1,5 +1,5 @@
 /* OpenCode PWA service worker — bump CACHE_VERSION when strategies change. */
-const CACHE_VERSION = "v2"
+const CACHE_VERSION = "v3"
 const SHELL_CACHE = `oc-shell-${CACHE_VERSION}`
 const ASSET_CACHE = `oc-assets-${CACHE_VERSION}`
 const STATIC_CACHE = `oc-static-${CACHE_VERSION}`
@@ -84,7 +84,32 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
-  if (API_PREFIX.has(url.pathname.split("/").filter(Boolean)[0] || "")) return
+  // A cold launch re-asks the server for the whole per-directory bootstrap: config,
+  // commands, agents, lsp/mcp state, the project record. Those answers barely change
+  // between launches but each one costs a round trip through the tunnel, and a
+  // home-screen app pays that bill on every icon tap. Serve them from cache first and
+  // refresh in the background so the shell paints immediately.
+  const SOFT_API = new Set(["agent", "command", "config", "formatter", "lsp", "mcp", "path", "project", "skill", "vcs"])
+  const first = url.pathname.split("/").filter(Boolean)[0] || ""
+  if (SOFT_API.has(first)) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then((cache) =>
+        cache.match(request).then((cached) => {
+          const network = fetch(request)
+            .then((response) => {
+              if (response.ok) cache.put(request, response.clone())
+              return response
+            })
+            .catch(() => cached ?? Response.error())
+          if (!cached) return network
+          event.waitUntil(network.then(() => undefined, () => undefined))
+          return cached
+        }),
+      ),
+    )
+    return
+  }
+  if (API_PREFIX.has(first)) return
 
   const store = (name, request, response) => {
     if (!response || !response.ok) return
@@ -92,13 +117,22 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
+    // Serve the cached shell immediately so the app paints without waiting for
+    // the Tailscale relay, then refresh it in the background for the next open.
+    // New builds are picked up on the visit after this one; hashed assets keep
+    // old and new shells consistent.
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          store(SHELL_CACHE, "/", response)
-          return response
-        })
-        .catch(() => caches.match("/").then((cached) => cached ?? Response.error())),
+      caches.match("/").then((cached) => {
+        const network = fetch(request)
+          .then((response) => {
+            store(SHELL_CACHE, "/", response)
+            return response
+          })
+          .catch(() => cached ?? Response.error())
+        if (!cached) return network
+        event.waitUntil(network.then(() => undefined, () => undefined))
+        return cached
+      }),
     )
     return
   }
